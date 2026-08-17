@@ -139,7 +139,7 @@ function proxyToBackend(req, res) {
   };
   delete opts.headers.host;
   var proto = target.protocol === "https:" ? httpsRequest : httpRequest;
-  var proxyReq = proto.request(opts, function(proxyRes) {
+  var proxyReq = proto(opts, function(proxyRes) {
     res.writeHead(proxyRes.statusCode, proxyRes.headers);
     proxyRes.pipe(res);
   });
@@ -219,6 +219,37 @@ const server = createServer(async function(req, res) {
   }
 
   proxyToBackend(req, res);
+});
+
+
+// ========== WebSocket ?? ==========
+server.on("upgrade", function(req, socket, head) {
+  var user = getUserFromCookie(req.headers.cookie);
+  if (!user) {
+    socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
+    socket.destroy();
+    return;
+  }
+  var target = new URL(req.url, BACKEND);
+  var opts = {
+    method: req.method,
+    headers: req.headers,
+    hostname: target.hostname,
+    port: target.port,
+    path: target.pathname + target.search,
+  };
+  delete opts.headers.host;
+  var proto = target.protocol === "https:" ? httpsRequest : httpRequest;
+  var proxyReq = proto(opts);
+  proxyReq.on("upgrade", function(proxyRes, proxySocket, proxyHead) {
+    socket.write("HTTP/1.1 101 Switching Protocols\r\n\r\n");
+    proxySocket.pipe(socket);
+    socket.pipe(proxySocket);
+  });
+  proxyReq.on("error", function() {
+    socket.destroy();
+  });
+  proxyReq.end();
 });
 
 server.listen(PORT, HOST, function() {
