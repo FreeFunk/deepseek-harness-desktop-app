@@ -1,4 +1,6 @@
 import { createServer } from "node:http";
+import { request as httpRequest } from "node:http";
+import { request as httpsRequest } from "node:https";
 import { DatabaseSync } from "node:sqlite";
 import { randomUUID, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 import { homedir } from "node:os";
@@ -136,7 +138,7 @@ function proxyToBackend(req, res) {
     path: target.pathname + target.search,
   };
   delete opts.headers.host;
-  var proto = target.protocol === "https:" ? require("node:https") : require("node:http");
+  var proto = target.protocol === "https:" ? httpsRequest : httpRequest;
   var proxyReq = proto.request(opts, function(proxyRes) {
     res.writeHead(proxyRes.statusCode, proxyRes.headers);
     proxyRes.pipe(res);
