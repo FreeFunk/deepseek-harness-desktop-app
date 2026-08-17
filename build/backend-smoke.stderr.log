@@ -1,0 +1,560 @@
+file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:1186
+		throw new Error(`${binName}: ${stage}: ${detail}${stack}`, { cause });
+		      ^
+
+Error: dsh: plugin tree failed to load: failed to apply loader entry include (cordis:include): loader entries failed to apply
+AggregateError: loader entries failed to apply
+    at EntryGroup.update (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:91:35)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async Include._apply (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:238:3)
+    at boot (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:1186:9)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async runProfile (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/lib/profile-boot-DG5t9aNs.js:247:14)
+    at async file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/lib/bin.js:133:3 {
+  [cause]: Error: failed to apply loader entry include (cordis:include): loader entries failed to apply
+      at updateError (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:299:9)
+      at Entry._init (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:519:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+      at async Entry.init (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:495:4)
+      at async Entry.update (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:416:37)
+      at async EntryGroup.create (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:55:4)
+      at async Proxy.create (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:217:14)
+      at async mountRootInclude (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:984:20)
+      at async boot (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:1175:3)
+      at async runProfile (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/lib/profile-boot-DG5t9aNs.js:247:14) {
+    [cause]: AggregateError: loader entries failed to apply
+        at EntryGroup.update (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:91:35)
+        at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+        at async Include._apply (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:238:3) {
+      [errors]: [
+        Error: failed to import loader entry typert (@deepseek-ai/dsh-typert-registry): Cannot find package 'zod' imported from D:\code\my-tool-code\deepseek-harness-desktop-app\build\backend\node_modules\@deepseek-ai\dsh-typert-registry\lib\index.js
+            at updateError (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:299:9)
+            at Entry._init (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:514:10)
+            at async Entry.init (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:495:4)
+            at async Entry.update (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:416:37)
+            at async EntryGroup.create (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:55:4)
+            at async Promise.allSettled (index 4)
+            at async EntryGroup.update (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:87:21)
+            at async Include._apply (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:238:3) {
+          [cause]: Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'zod' imported from D:\code\my-tool-code\deepseek-harness-desktop-app\build\backend\node_modules\@deepseek-ai\dsh-typert-registry\lib\index.js
+              at Object.getPackageJSONURL (node:internal/modules/package_json_reader:266:9)
+              at packageResolve (node:internal/modules/esm/resolve:767:81)
+              at moduleResolve (node:internal/modules/esm/resolve:853:18)
+              at defaultResolve (node:internal/modules/esm/resolve:983:11)
+              at #cachedDefaultResolve (node:internal/modules/esm/loader:731:20)
+              at ModuleLoader.resolve (node:internal/modules/esm/loader:708:38)
+              at ModuleLoader.getModuleJobForImport (node:internal/modules/esm/loader:310:38)
+              at ModuleJob._link (node:internal/modules/esm/module_job:183:49) {
+            code: 'ERR_MODULE_NOT_FOUND'
+          }
+        },
+        Error: failed to import loader entry session-title (@deepseek-ai/dsh-session-title): Cannot find package 'zod' imported from D:\code\my-tool-code\deepseek-harness-desktop-app\build\backend\node_modules\@deepseek-ai\dsh-session-title\lib\index.js
+            at updateError (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:299:9)
+            at Entry._init (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:514:10)
+            at async Entry.init (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:495:4)
+            at async Entry.update (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:416:37)
+            at async EntryGroup.create (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:55:4)
+            at async Promise.allSettled (index 7)
+            at async EntryGroup.update (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:87:21)
+            at async Include._apply (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:238:3) {
+          [cause]: Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'zod' imported from D:\code\my-tool-code\deepseek-harness-desktop-app\build\backend\node_modules\@deepseek-ai\dsh-session-title\lib\index.js
+              at Object.getPackageJSONURL (node:internal/modules/package_json_reader:266:9)
+              at packageResolve (node:internal/modules/esm/resolve:767:81)
+              at moduleResolve (node:internal/modules/esm/resolve:853:18)
+              at defaultResolve (node:internal/modules/esm/resolve:983:11)
+              at #cachedDefaultResolve (node:internal/modules/esm/loader:731:20)
+              at ModuleLoader.resolve (node:internal/modules/esm/loader:708:38)
+              at ModuleLoader.getModuleJobForImport (node:internal/modules/esm/loader:310:38)
+              at ModuleJob._link (node:internal/modules/esm/module_job:183:49) {
+            code: 'ERR_MODULE_NOT_FOUND'
+          }
+        },
+        Error: failed to import loader entry session-title-llm (@deepseek-ai/dsh-session-title-first-prompt-llm): Cannot find package 'zod' imported from D:\code\my-tool-code\deepseek-harness-desktop-app\build\backend\node_modules\@deepseek-ai\dsh-session-title\lib\index.js
+            at updateError (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:299:9)
+            at Entry._init (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:514:10)
+            at async Entry.init (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:495:4)
+            at async Entry.update (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:416:37)
+            at async EntryGroup.create (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:55:4)
+            at async Promise.allSettled (index 8)
+            at async EntryGroup.update (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:87:21)
+            at async Include._apply (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:238:3) {
+          [cause]: Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'zod' imported from D:\code\my-tool-code\deepseek-harness-desktop-app\build\backend\node_modules\@deepseek-ai\dsh-session-title\lib\index.js
+              at Object.getPackageJSONURL (node:internal/modules/package_json_reader:266:9)
+              at packageResolve (node:internal/modules/esm/resolve:767:81)
+              at moduleResolve (node:internal/modules/esm/resolve:853:18)
+              at defaultResolve (node:internal/modules/esm/resolve:983:11)
+              at #cachedDefaultResolve (node:internal/modules/esm/loader:731:20)
+              at ModuleLoader.resolve (node:internal/modules/esm/loader:708:38)
+              at ModuleLoader.getModuleJobForImport (node:internal/modules/esm/loader:310:38)
+              at ModuleJob._link (node:internal/modules/esm/module_job:183:49) {
+            code: 'ERR_MODULE_NOT_FOUND'
+          }
+        },
+        Error: failed to import loader entry settings (@deepseek-ai/dsh-settings-file): Cannot find package 'chokidar' imported from D:\code\my-tool-code\deepseek-harness-desktop-app\build\backend\node_modules\@deepseek-ai\dsh-settings-file\lib\index.js
+            at updateError (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:299:9)
+            at Entry._init (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:514:10)
+            at async Entry.init (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:495:4)
+            at async Entry.update (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:416:37)
+            at async EntryGroup.create (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:55:4)
+            at async Promise.allSettled (index 14)
+            at async EntryGroup.update (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:87:21)
+            at async Include._apply (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:238:3) {
+          [cause]: Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'chokidar' imported from D:\code\my-tool-code\deepseek-harness-desktop-app\build\backend\node_modules\@deepseek-ai\dsh-settings-file\lib\index.js
+              at Object.getPackageJSONURL (node:internal/modules/package_json_reader:266:9)
+              at packageResolve (node:internal/modules/esm/resolve:767:81)
+              at moduleResolve (node:internal/modules/esm/resolve:853:18)
+              at defaultResolve (node:internal/modules/esm/resolve:983:11)
+              at #cachedDefaultResolve (node:internal/modules/esm/loader:731:20)
+              at ModuleLoader.resolve (node:internal/modules/esm/loader:708:38)
+              at ModuleLoader.getModuleJobForImport (node:internal/modules/esm/loader:310:38)
+              at ModuleJob._link (node:internal/modules/esm/module_job:183:49) {
+            code: 'ERR_MODULE_NOT_FOUND'
+          }
+        },
+        Error: failed to import loader entry credentials (@deepseek-ai/dsh-credentials-local): Cannot find package 'chokidar' imported from D:\code\my-tool-code\deepseek-harness-desktop-app\build\backend\node_modules\@deepseek-ai\dsh-credentials-local\lib\index.js
+            at updateError (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:299:9)
+            at Entry._init (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:514:10)
+            at async Entry.init (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:495:4)
+            at async Entry.update (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:416:37)
+            at async EntryGroup.create (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:55:4)
+            at async Promise.allSettled (index 15)
+            at async EntryGroup.update (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:87:21)
+            at async Include._apply (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:238:3) {
+          [cause]: Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'chokidar' imported from D:\code\my-tool-code\deepseek-harness-desktop-app\build\backend\node_modules\@deepseek-ai\dsh-credentials-local\lib\index.js
+              at Object.getPackageJSONURL (node:internal/modules/package_json_reader:266:9)
+              at packageResolve (node:internal/modules/esm/resolve:767:81)
+              at moduleResolve (node:internal/modules/esm/resolve:853:18)
+              at defaultResolve (node:internal/modules/esm/resolve:983:11)
+              at #cachedDefaultResolve (node:internal/modules/esm/loader:731:20)
+              at ModuleLoader.resolve (node:internal/modules/esm/loader:708:38)
+              at ModuleLoader.getModuleJobForImport (node:internal/modules/esm/loader:310:38)
+              at ModuleJob._link (node:internal/modules/esm/module_job:183:49) {
+            code: 'ERR_MODULE_NOT_FOUND'
+          }
+        },
+        Error: failed to import loader entry llm-pi-ai (@deepseek-ai/dsh-llm-pi-ai): Cannot find package '@earendil-works/pi-ai' imported from D:\code\my-tool-code\deepseek-harness-desktop-app\build\backend\node_modules\@deepseek-ai\dsh-llm-pi-ai\lib\index.js
+            at updateError (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:299:9)
+            at Entry._init (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:514:10)
+            at async Entry.init (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:495:4)
+            at async Entry.update (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:416:37)
+            at async EntryGroup.create (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:55:4)
+            at async Promise.allSettled (index 16)
+            at async EntryGroup.update (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:87:21)
+            at async Include._apply (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:238:3) {
+          [cause]: Error [ERR_MODULE_NOT_FOUND]: Cannot find package '@earendil-works/pi-ai' imported from D:\code\my-tool-code\deepseek-harness-desktop-app\build\backend\node_modules\@deepseek-ai\dsh-llm-pi-ai\lib\index.js
+              at Object.getPackageJSONURL (node:internal/modules/package_json_reader:266:9)
+              at packageResolve (node:internal/modules/esm/resolve:767:81)
+              at moduleResolve (node:internal/modules/esm/resolve:853:18)
+              at defaultResolve (node:internal/modules/esm/resolve:983:11)
+              at #cachedDefaultResolve (node:internal/modules/esm/loader:731:20)
+              at ModuleLoader.resolve (node:internal/modules/esm/loader:708:38)
+              at ModuleLoader.getModuleJobForImport (node:internal/modules/esm/loader:310:38)
+              at ModuleJob._link (node:internal/modules/esm/module_job:183:49) {
+            code: 'ERR_MODULE_NOT_FOUND'
+          }
+        },
+        Error: failed to import loader entry attachment-local (@deepseek-ai/dsh-attachment-local): Cannot find package 'sharp' imported from D:\code\my-tool-code\deepseek-harness-desktop-app\build\backend\node_modules\@deepseek-ai\dsh-attachment-local\lib\index.js
+            at updateError (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:299:9)
+            at Entry._init (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:514:10)
+            at async Entry.init (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:495:4)
+            at async Entry.update (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:416:37)
+            at async EntryGroup.create (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:55:4)
+            at async Promise.allSettled (index 18)
+            at async EntryGroup.update (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:87:21)
+            at async Include._apply (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:238:3) {
+          [cause]: Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'sharp' imported from D:\code\my-tool-code\deepseek-harness-desktop-app\build\backend\node_modules\@deepseek-ai\dsh-attachment-local\lib\index.js
+              at Object.getPackageJSONURL (node:internal/modules/package_json_reader:266:9)
+              at packageResolve (node:internal/modules/esm/resolve:767:81)
+              at moduleResolve (node:internal/modules/esm/resolve:853:18)
+              at defaultResolve (node:internal/modules/esm/resolve:983:11)
+              at #cachedDefaultResolve (node:internal/modules/esm/loader:731:20)
+              at ModuleLoader.resolve (node:internal/modules/esm/loader:708:38)
+              at ModuleLoader.getModuleJobForImport (node:internal/modules/esm/loader:310:38)
+              at ModuleJob._link (node:internal/modules/esm/module_job:183:49) {
+            code: 'ERR_MODULE_NOT_FOUND'
+          }
+        },
+        Error: failed to import loader entry session-query-sqlite (@deepseek-ai/dsh-session-query-sqlite): Cannot find package 'zod' imported from D:\code\my-tool-code\deepseek-harness-desktop-app\build\backend\node_modules\@deepseek-ai\dsh-session-title\lib\index.js
+            at updateError (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:299:9)
+            at Entry._init (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:514:10)
+            at async Entry.init (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:495:4)
+            at async Entry.update (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:416:37)
+            at async EntryGroup.create (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:55:4)
+            at async Promise.allSettled (index 19)
+            at async EntryGroup.update (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:87:21)
+            at async Include._apply (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:238:3) {
+          [cause]: Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'zod' imported from D:\code\my-tool-code\deepseek-harness-desktop-app\build\backend\node_modules\@deepseek-ai\dsh-session-title\lib\index.js
+              at Object.getPackageJSONURL (node:internal/modules/package_json_reader:266:9)
+              at packageResolve (node:internal/modules/esm/resolve:767:81)
+              at moduleResolve (node:internal/modules/esm/resolve:853:18)
+              at defaultResolve (node:internal/modules/esm/resolve:983:11)
+              at #cachedDefaultResolve (node:internal/modules/esm/loader:731:20)
+              at ModuleLoader.resolve (node:internal/modules/esm/loader:708:38)
+              at ModuleLoader.getModuleJobForImport (node:internal/modules/esm/loader:310:38)
+              at ModuleJob._link (node:internal/modules/esm/module_job:183:49) {
+            code: 'ERR_MODULE_NOT_FOUND'
+          }
+        },
+        Error: failed to import loader entry session-telemetry-otel (@deepseek-ai/dsh-session-telemetry-otel): Cannot find package '@opentelemetry/sdk-logs' imported from D:\code\my-tool-code\deepseek-harness-desktop-app\build\backend\node_modules\@deepseek-ai\dsh-session-telemetry-otel\lib\index.js
+            at updateError (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:299:9)
+            at Entry._init (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:514:10)
+            at async Entry.init (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:495:4)
+            at async Entry.update (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:416:37)
+            at async EntryGroup.create (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:55:4)
+            at async Promise.allSettled (index 21)
+            at async EntryGroup.update (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:87:21)
+            at async Include._apply (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:238:3) {
+          [cause]: Error [ERR_MODULE_NOT_FOUND]: Cannot find package '@opentelemetry/sdk-logs' imported from D:\code\my-tool-code\deepseek-harness-desktop-app\build\backend\node_modules\@deepseek-ai\dsh-session-telemetry-otel\lib\index.js
+              at Object.getPackageJSONURL (node:internal/modules/package_json_reader:266:9)
+              at packageResolve (node:internal/modules/esm/resolve:767:81)
+              at moduleResolve (node:internal/modules/esm/resolve:853:18)
+              at defaultResolve (node:internal/modules/esm/resolve:983:11)
+              at #cachedDefaultResolve (node:internal/modules/esm/loader:731:20)
+              at ModuleLoader.resolve (node:internal/modules/esm/loader:708:38)
+              at ModuleLoader.getModuleJobForImport (node:internal/modules/esm/loader:310:38)
+              at ModuleJob._link (node:internal/modules/esm/module_job:183:49) {
+            code: 'ERR_MODULE_NOT_FOUND'
+          }
+        },
+        Error: failed to import loader entry subprocess (@deepseek-ai/dsh-subprocess-local): Cannot find package 'node-pty' imported from D:\code\my-tool-code\deepseek-harness-desktop-app\build\backend\node_modules\@deepseek-ai\dsh-subprocess-local\lib\index.js
+            at updateError (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:299:9)
+            at Entry._init (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:514:10)
+            at async Entry.init (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:495:4)
+            at async Entry.update (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:416:37)
+            at async EntryGroup.create (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:55:4)
+            at async Promise.allSettled (index 22)
+            at async EntryGroup.update (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:87:21)
+            at async Include._apply (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:238:3) {
+          [cause]: Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'node-pty' imported from D:\code\my-tool-code\deepseek-harness-desktop-app\build\backend\node_modules\@deepseek-ai\dsh-subprocess-local\lib\index.js
+              at Object.getPackageJSONURL (node:internal/modules/package_json_reader:266:9)
+              at packageResolve (node:internal/modules/esm/resolve:767:81)
+              at moduleResolve (node:internal/modules/esm/resolve:853:18)
+              at defaultResolve (node:internal/modules/esm/resolve:983:11)
+              at #cachedDefaultResolve (node:internal/modules/esm/loader:731:20)
+              at ModuleLoader.resolve (node:internal/modules/esm/loader:708:38)
+              at ModuleLoader.getModuleJobForImport (node:internal/modules/esm/loader:310:38)
+              at ModuleJob._link (node:internal/modules/esm/module_job:183:49) {
+            code: 'ERR_MODULE_NOT_FOUND'
+          }
+        },
+        Error: failed to import loader entry sandbox (@deepseek-ai/dsh-sandbox-local): Cannot find package '@deepseek-ai/node-addon-landlock-run' imported from D:\code\my-tool-code\deepseek-harness-desktop-app\build\backend\node_modules\@deepseek-ai\dsh-sandbox-local\lib\index.js
+            at updateError (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:299:9)
+            at Entry._init (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:514:10)
+            at async Entry.init (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:495:4)
+            at async Entry.update (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:416:37)
+            at async EntryGroup.create (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:55:4)
+            at async Promise.allSettled (index 23)
+            at async EntryGroup.update (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:87:21)
+            at async Include._apply (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:238:3) {
+          [cause]: Error [ERR_MODULE_NOT_FOUND]: Cannot find package '@deepseek-ai/node-addon-landlock-run' imported from D:\code\my-tool-code\deepseek-harness-desktop-app\build\backend\node_modules\@deepseek-ai\dsh-sandbox-local\lib\index.js
+              at Object.getPackageJSONURL (node:internal/modules/package_json_reader:266:9)
+              at packageResolve (node:internal/modules/esm/resolve:767:81)
+              at moduleResolve (node:internal/modules/esm/resolve:853:18)
+              at defaultResolve (node:internal/modules/esm/resolve:983:11)
+              at #cachedDefaultResolve (node:internal/modules/esm/loader:731:20)
+              at ModuleLoader.resolve (node:internal/modules/esm/loader:708:38)
+              at ModuleLoader.getModuleJobForImport (node:internal/modules/esm/loader:310:38)
+              at ModuleJob._link (node:internal/modules/esm/module_job:183:49) {
+            code: 'ERR_MODULE_NOT_FOUND'
+          }
+        },
+        Error: failed to import loader entry permission (@deepseek-ai/dsh-permission-presets): Cannot find package 'zod' imported from D:\code\my-tool-code\deepseek-harness-desktop-app\build\backend\node_modules\@deepseek-ai\dsh-permission-presets\lib\index.js
+            at updateError (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:299:9)
+            at Entry._init (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:514:10)
+            at async Entry.init (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:495:4)
+            at async Entry.update (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:416:37)
+            at async EntryGroup.create (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:55:4)
+            at async Promise.allSettled (index 28)
+            at async EntryGroup.update (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:87:21)
+            at async Include._apply (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:238:3) {
+          [cause]: Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'zod' imported from D:\code\my-tool-code\deepseek-harness-desktop-app\build\backend\node_modules\@deepseek-ai\dsh-permission-presets\lib\index.js
+              at Object.getPackageJSONURL (node:internal/modules/package_json_reader:266:9)
+              at packageResolve (node:internal/modules/esm/resolve:767:81)
+              at moduleResolve (node:internal/modules/esm/resolve:853:18)
+              at defaultResolve (node:internal/modules/esm/resolve:983:11)
+              at #cachedDefaultResolve (node:internal/modules/esm/loader:731:20)
+              at ModuleLoader.resolve (node:internal/modules/esm/loader:708:38)
+              at ModuleLoader.getModuleJobForImport (node:internal/modules/esm/loader:310:38)
+              at ModuleJob._link (node:internal/modules/esm/module_job:183:49) {
+            code: 'ERR_MODULE_NOT_FOUND'
+          }
+        },
+        Error: failed to import loader entry goal (@deepseek-ai/dsh-goal): Cannot find package 'zod' imported from D:\code\my-tool-code\deepseek-harness-desktop-app\build\backend\node_modules\@deepseek-ai\dsh-goal\lib\index.js
+            at updateError (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:299:9)
+            at Entry._init (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:514:10)
+            at async Entry.init (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:495:4)
+            at async Entry.update (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:416:37)
+            at async EntryGroup.create (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:55:4)
+            at async Promise.allSettled (index 43)
+            at async EntryGroup.update (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:87:21)
+            at async Include._apply (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:238:3) {
+          [cause]: Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'zod' imported from D:\code\my-tool-code\deepseek-harness-desktop-app\build\backend\node_modules\@deepseek-ai\dsh-goal\lib\index.js
+              at Object.getPackageJSONURL (node:internal/modules/package_json_reader:266:9)
+              at packageResolve (node:internal/modules/esm/resolve:767:81)
+              at moduleResolve (node:internal/modules/esm/resolve:853:18)
+              at defaultResolve (node:internal/modules/esm/resolve:983:11)
+              at #cachedDefaultResolve (node:internal/modules/esm/loader:731:20)
+              at ModuleLoader.resolve (node:internal/modules/esm/loader:708:38)
+              at ModuleLoader.getModuleJobForImport (node:internal/modules/esm/loader:310:38)
+              at ModuleJob._link (node:internal/modules/esm/module_job:183:49) {
+            code: 'ERR_MODULE_NOT_FOUND'
+          }
+        },
+        Error: failed to import loader entry command-goal (@deepseek-ai/dsh-command-goal): Cannot find package 'zod' imported from D:\code\my-tool-code\deepseek-harness-desktop-app\build\backend\node_modules\@deepseek-ai\dsh-goal\lib\index.js
+            at updateError (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:299:9)
+            at Entry._init (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:514:10)
+            at async Entry.init (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:495:4)
+            at async Entry.update (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:416:37)
+            at async EntryGroup.create (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:55:4)
+            at async Promise.allSettled (index 45)
+            at async EntryGroup.update (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:87:21)
+            at async Include._apply (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:238:3) {
+          [cause]: Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'zod' imported from D:\code\my-tool-code\deepseek-harness-desktop-app\build\backend\node_modules\@deepseek-ai\dsh-goal\lib\index.js
+              at Object.getPackageJSONURL (node:internal/modules/package_json_reader:266:9)
+              at packageResolve (node:internal/modules/esm/resolve:767:81)
+              at moduleResolve (node:internal/modules/esm/resolve:853:18)
+              at defaultResolve (node:internal/modules/esm/resolve:983:11)
+              at #cachedDefaultResolve (node:internal/modules/esm/loader:731:20)
+              at ModuleLoader.resolve (node:internal/modules/esm/loader:708:38)
+              at ModuleLoader.getModuleJobForImport (node:internal/modules/esm/loader:310:38)
+              at ModuleJob._link (node:internal/modules/esm/module_job:183:49) {
+            code: 'ERR_MODULE_NOT_FOUND'
+          }
+        },
+        Error: failed to import loader entry token-meter (@deepseek-ai/dsh-token-meter): Cannot find package 'zod' imported from D:\code\my-tool-code\deepseek-harness-desktop-app\build\backend\node_modules\@deepseek-ai\dsh-token-meter\lib\index.js
+            at updateError (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:299:9)
+            at Entry._init (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:514:10)
+            at async Entry.init (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:495:4)
+            at async Entry.update (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:416:37)
+            at async EntryGroup.create (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:55:4)
+            at async Promise.allSettled (index 47)
+            at async EntryGroup.update (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:87:21)
+            at async Include._apply (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:238:3) {
+          [cause]: Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'zod' imported from D:\code\my-tool-code\deepseek-harness-desktop-app\build\backend\node_modules\@deepseek-ai\dsh-token-meter\lib\index.js
+              at Object.getPackageJSONURL (node:internal/modules/package_json_reader:266:9)
+              at packageResolve (node:internal/modules/esm/resolve:767:81)
+              at moduleResolve (node:internal/modules/esm/resolve:853:18)
+              at defaultResolve (node:internal/modules/esm/resolve:983:11)
+              at #cachedDefaultResolve (node:internal/modules/esm/loader:731:20)
+              at ModuleLoader.resolve (node:internal/modules/esm/loader:708:38)
+              at ModuleLoader.getModuleJobForImport (node:internal/modules/esm/loader:310:38)
+              at ModuleJob._link (node:internal/modules/esm/module_job:183:49) {
+            code: 'ERR_MODULE_NOT_FOUND'
+          }
+        },
+        Error: failed to import loader entry subagent (@deepseek-ai/dsh-subagent): Cannot find package 'zod' imported from D:\code\my-tool-code\deepseek-harness-desktop-app\build\backend\node_modules\@deepseek-ai\dsh-subagent\lib\index.js
+            at updateError (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:299:9)
+            at Entry._init (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:514:10)
+            at async Entry.init (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:495:4)
+            at async Entry.update (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:416:37)
+            at async EntryGroup.create (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:55:4)
+            at async Promise.allSettled (index 50)
+            at async EntryGroup.update (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:87:21)
+            at async Include._apply (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:238:3) {
+          [cause]: Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'zod' imported from D:\code\my-tool-code\deepseek-harness-desktop-app\build\backend\node_modules\@deepseek-ai\dsh-subagent\lib\index.js
+              at Object.getPackageJSONURL (node:internal/modules/package_json_reader:266:9)
+              at packageResolve (node:internal/modules/esm/resolve:767:81)
+              at moduleResolve (node:internal/modules/esm/resolve:853:18)
+              at defaultResolve (node:internal/modules/esm/resolve:983:11)
+              at #cachedDefaultResolve (node:internal/modules/esm/loader:731:20)
+              at ModuleLoader.resolve (node:internal/modules/esm/loader:708:38)
+              at ModuleLoader.getModuleJobForImport (node:internal/modules/esm/loader:310:38)
+              at ModuleJob._link (node:internal/modules/esm/module_job:183:49) {
+            code: 'ERR_MODULE_NOT_FOUND'
+          }
+        },
+        Error: failed to import loader entry subagent-spawn-in-process (@deepseek-ai/dsh-subagent-spawn-in-process): Cannot find package 'zod' imported from D:\code\my-tool-code\deepseek-harness-desktop-app\build\backend\node_modules\@deepseek-ai\dsh-subagent\lib\index.js
+            at updateError (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:299:9)
+            at Entry._init (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:514:10)
+            at async Entry.init (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:495:4)
+            at async Entry.update (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:416:37)
+            at async EntryGroup.create (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:55:4)
+            at async Promise.allSettled (index 51)
+            at async EntryGroup.update (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:87:21)
+            at async Include._apply (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:238:3) {
+          [cause]: Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'zod' imported from D:\code\my-tool-code\deepseek-harness-desktop-app\build\backend\node_modules\@deepseek-ai\dsh-subagent\lib\index.js
+              at Object.getPackageJSONURL (node:internal/modules/package_json_reader:266:9)
+              at packageResolve (node:internal/modules/esm/resolve:767:81)
+              at moduleResolve (node:internal/modules/esm/resolve:853:18)
+              at defaultResolve (node:internal/modules/esm/resolve:983:11)
+              at #cachedDefaultResolve (node:internal/modules/esm/loader:731:20)
+              at ModuleLoader.resolve (node:internal/modules/esm/loader:708:38)
+              at ModuleLoader.getModuleJobForImport (node:internal/modules/esm/loader:310:38)
+              at ModuleJob._link (node:internal/modules/esm/module_job:183:49) {
+            code: 'ERR_MODULE_NOT_FOUND'
+          }
+        },
+        Error: failed to import loader entry subagent-fork-in-process (@deepseek-ai/dsh-subagent-fork-in-process): Cannot find package 'zod' imported from D:\code\my-tool-code\deepseek-harness-desktop-app\build\backend\node_modules\@deepseek-ai\dsh-subagent\lib\index.js
+            at updateError (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:299:9)
+            at Entry._init (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:514:10)
+            at async Entry.init (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:495:4)
+            at async Entry.update (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:416:37)
+            at async EntryGroup.create (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:55:4)
+            at async Promise.allSettled (index 52)
+            at async EntryGroup.update (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:87:21)
+            at async Include._apply (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:238:3) {
+          [cause]: Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'zod' imported from D:\code\my-tool-code\deepseek-harness-desktop-app\build\backend\node_modules\@deepseek-ai\dsh-subagent\lib\index.js
+              at Object.getPackageJSONURL (node:internal/modules/package_json_reader:266:9)
+              at packageResolve (node:internal/modules/esm/resolve:767:81)
+              at moduleResolve (node:internal/modules/esm/resolve:853:18)
+              at defaultResolve (node:internal/modules/esm/resolve:983:11)
+              at #cachedDefaultResolve (node:internal/modules/esm/loader:731:20)
+              at ModuleLoader.resolve (node:internal/modules/esm/loader:708:38)
+              at ModuleLoader.getModuleJobForImport (node:internal/modules/esm/loader:310:38)
+              at ModuleJob._link (node:internal/modules/esm/module_job:183:49) {
+            code: 'ERR_MODULE_NOT_FOUND'
+          }
+        },
+        Error: failed to import loader entry llm-deepseek (@deepseek-ai/dsh-llm-deepseek): Cannot find package 'eventsource-parser' imported from D:\code\my-tool-code\deepseek-harness-desktop-app\build\backend\node_modules\@deepseek-ai\dsh-llm-deepseek\lib\index.js
+            at updateError (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:299:9)
+            at Entry._init (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:514:10)
+            at async Entry.init (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:495:4)
+            at async Entry.update (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:416:37)
+            at async EntryGroup.create (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:55:4)
+            at async Promise.allSettled (index 77)
+            at async EntryGroup.update (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:87:21)
+            at async Include._apply (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:238:3) {
+          [cause]: Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'eventsource-parser' imported from D:\code\my-tool-code\deepseek-harness-desktop-app\build\backend\node_modules\@deepseek-ai\dsh-llm-deepseek\lib\index.js
+              at Object.getPackageJSONURL (node:internal/modules/package_json_reader:266:9)
+              at packageResolve (node:internal/modules/esm/resolve:767:81)
+              at moduleResolve (node:internal/modules/esm/resolve:853:18)
+              at defaultResolve (node:internal/modules/esm/resolve:983:11)
+              at #cachedDefaultResolve (node:internal/modules/esm/loader:731:20)
+              at ModuleLoader.resolve (node:internal/modules/esm/loader:708:38)
+              at ModuleLoader.getModuleJobForImport (node:internal/modules/esm/loader:310:38)
+              at ModuleJob._link (node:internal/modules/esm/module_job:183:49) {
+            code: 'ERR_MODULE_NOT_FOUND'
+          }
+        },
+        Error: failed to import loader entry message-feedback (@deepseek-ai/dsh-message-feedback): Cannot find package 'zod' imported from D:\code\my-tool-code\deepseek-harness-desktop-app\build\backend\node_modules\@deepseek-ai\dsh-message-feedback\lib\index.js
+            at updateError (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:299:9)
+            at Entry._init (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:514:10)
+            at async Entry.init (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:495:4)
+            at async Entry.update (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:416:37)
+            at async EntryGroup.create (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:55:4)
+            at async Promise.allSettled (index 82)
+            at async EntryGroup.update (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:87:21)
+            at async Include._apply (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:238:3) {
+          [cause]: Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'zod' imported from D:\code\my-tool-code\deepseek-harness-desktop-app\build\backend\node_modules\@deepseek-ai\dsh-message-feedback\lib\index.js
+              at Object.getPackageJSONURL (node:internal/modules/package_json_reader:266:9)
+              at packageResolve (node:internal/modules/esm/resolve:767:81)
+              at moduleResolve (node:internal/modules/esm/resolve:853:18)
+              at defaultResolve (node:internal/modules/esm/resolve:983:11)
+              at #cachedDefaultResolve (node:internal/modules/esm/loader:731:20)
+              at ModuleLoader.resolve (node:internal/modules/esm/loader:708:38)
+              at ModuleLoader.getModuleJobForImport (node:internal/modules/esm/loader:310:38)
+              at ModuleJob._link (node:internal/modules/esm/module_job:183:49) {
+            code: 'ERR_MODULE_NOT_FOUND'
+          }
+        },
+        Error: failed to import loader entry workspace (@deepseek-ai/dsh-workspace): Cannot find package 'zod' imported from D:\code\my-tool-code\deepseek-harness-desktop-app\build\backend\node_modules\@deepseek-ai\dsh-workspace\lib\index.js
+            at updateError (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:299:9)
+            at Entry._init (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:514:10)
+            at async Entry.init (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:495:4)
+            at async Entry.update (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:416:37)
+            at async EntryGroup.create (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:55:4)
+            at async Promise.allSettled (index 84)
+            at async EntryGroup.update (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:87:21)
+            at async Include._apply (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:238:3) {
+          [cause]: Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'zod' imported from D:\code\my-tool-code\deepseek-harness-desktop-app\build\backend\node_modules\@deepseek-ai\dsh-workspace\lib\index.js
+              at Object.getPackageJSONURL (node:internal/modules/package_json_reader:266:9)
+              at packageResolve (node:internal/modules/esm/resolve:767:81)
+              at moduleResolve (node:internal/modules/esm/resolve:853:18)
+              at defaultResolve (node:internal/modules/esm/resolve:983:11)
+              at #cachedDefaultResolve (node:internal/modules/esm/loader:731:20)
+              at ModuleLoader.resolve (node:internal/modules/esm/loader:708:38)
+              at ModuleLoader.getModuleJobForImport (node:internal/modules/esm/loader:310:38)
+              at ModuleJob._link (node:internal/modules/esm/module_job:183:49) {
+            code: 'ERR_MODULE_NOT_FOUND'
+          }
+        },
+        Error: failed to import loader entry session-projection-cache (@deepseek-ai/dsh-session-projection-cache): Cannot find package 'zod' imported from D:\code\my-tool-code\deepseek-harness-desktop-app\build\backend\node_modules\@deepseek-ai\dsh-session-projection-cache\lib\index.js
+            at updateError (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:299:9)
+            at Entry._init (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:514:10)
+            at async Entry.init (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:495:4)
+            at async Entry.update (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:416:37)
+            at async EntryGroup.create (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:55:4)
+            at async Promise.allSettled (index 85)
+            at async EntryGroup.update (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:87:21)
+            at async Include._apply (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:238:3) {
+          [cause]: Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'zod' imported from D:\code\my-tool-code\deepseek-harness-desktop-app\build\backend\node_modules\@deepseek-ai\dsh-session-projection-cache\lib\index.js
+              at Object.getPackageJSONURL (node:internal/modules/package_json_reader:266:9)
+              at packageResolve (node:internal/modules/esm/resolve:767:81)
+              at moduleResolve (node:internal/modules/esm/resolve:853:18)
+              at defaultResolve (node:internal/modules/esm/resolve:983:11)
+              at #cachedDefaultResolve (node:internal/modules/esm/loader:731:20)
+              at ModuleLoader.resolve (node:internal/modules/esm/loader:708:38)
+              at ModuleLoader.getModuleJobForImport (node:internal/modules/esm/loader:310:38)
+              at ModuleJob._link (node:internal/modules/esm/module_job:183:49) {
+            code: 'ERR_MODULE_NOT_FOUND'
+          }
+        },
+        Error: failed to import loader entry session-stats (@deepseek-ai/dsh-session-stats): Cannot find package 'zod' imported from D:\code\my-tool-code\deepseek-harness-desktop-app\build\backend\node_modules\@deepseek-ai\dsh-session-stats\lib\index.js
+            at updateError (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:299:9)
+            at Entry._init (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:514:10)
+            at async Entry.init (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:495:4)
+            at async Entry.update (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:416:37)
+            at async EntryGroup.create (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:55:4)
+            at async Promise.allSettled (index 86)
+            at async EntryGroup.update (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:87:21)
+            at async Include._apply (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:238:3) {
+          [cause]: Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'zod' imported from D:\code\my-tool-code\deepseek-harness-desktop-app\build\backend\node_modules\@deepseek-ai\dsh-session-stats\lib\index.js
+              at Object.getPackageJSONURL (node:internal/modules/package_json_reader:266:9)
+              at packageResolve (node:internal/modules/esm/resolve:767:81)
+              at moduleResolve (node:internal/modules/esm/resolve:853:18)
+              at defaultResolve (node:internal/modules/esm/resolve:983:11)
+              at #cachedDefaultResolve (node:internal/modules/esm/loader:731:20)
+              at ModuleLoader.resolve (node:internal/modules/esm/loader:708:38)
+              at ModuleLoader.getModuleJobForImport (node:internal/modules/esm/loader:310:38)
+              at ModuleJob._link (node:internal/modules/esm/module_job:183:49) {
+            code: 'ERR_MODULE_NOT_FOUND'
+          }
+        },
+        Error: failed to import loader entry api-gateway (@deepseek-ai/dsh-host-apiproxy): Cannot find package 'fflate' imported from D:\code\my-tool-code\deepseek-harness-desktop-app\build\backend\node_modules\@deepseek-ai\dsh-host-apiproxy\lib\index.js
+            at updateError (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:299:9)
+            at Entry._init (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:514:10)
+            at async Entry.init (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:495:4)
+            at async Entry.update (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:416:37)
+            at async EntryGroup.create (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:55:4)
+            at async Promise.allSettled (index 89)
+            at async EntryGroup.update (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:87:21)
+            at async Include._apply (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:238:3) {
+          [cause]: Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'fflate' imported from D:\code\my-tool-code\deepseek-harness-desktop-app\build\backend\node_modules\@deepseek-ai\dsh-host-apiproxy\lib\index.js
+              at Object.getPackageJSONURL (node:internal/modules/package_json_reader:266:9)
+              at packageResolve (node:internal/modules/esm/resolve:767:81)
+              at moduleResolve (node:internal/modules/esm/resolve:853:18)
+              at defaultResolve (node:internal/modules/esm/resolve:983:11)
+              at #cachedDefaultResolve (node:internal/modules/esm/loader:731:20)
+              at ModuleLoader.resolve (node:internal/modules/esm/loader:708:38)
+              at ModuleLoader.getModuleJobForImport (node:internal/modules/esm/loader:310:38)
+              at ModuleJob._link (node:internal/modules/esm/module_job:183:49) {
+            code: 'ERR_MODULE_NOT_FOUND'
+          }
+        },
+        Error: failed to import loader entry connection (@deepseek-ai/dsh-client-connection): Cannot find package 'ws' imported from D:\code\my-tool-code\deepseek-harness-desktop-app\build\backend\node_modules\@deepseek-ai\dsh-client-connection\lib\index.js
+            at updateError (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:299:9)
+            at Entry._init (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:514:10)
+            at async Entry.init (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:495:4)
+            at async Entry.update (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:416:37)
+            at async EntryGroup.create (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:55:4)
+            at async Promise.allSettled (index 96)
+            at async EntryGroup.update (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/cordis-plugin-loader/lib/index.js:87:21)
+            at async Include._apply (file:///D:/code/my-tool-code/deepseek-harness-desktop-app/build/backend/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js:238:3) {
+          [cause]: Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'ws' imported from D:\code\my-tool-code\deepseek-harness-desktop-app\build\backend\node_modules\@deepseek-ai\dsh-client-connection\lib\index.js
+              at Object.getPackageJSONURL (node:internal/modules/package_json_reader:266:9)
+              at packageResolve (node:internal/modules/esm/resolve:767:81)
+              at moduleResolve (node:internal/modules/esm/resolve:853:18)
+              at defaultResolve (node:internal/modules/esm/resolve:983:11)
+              at #cachedDefaultResolve (node:internal/modules/esm/loader:731:20)
+              at ModuleLoader.resolve (node:internal/modules/esm/loader:708:38)
+              at ModuleLoader.getModuleJobForImport (node:internal/modules/esm/loader:310:38)
+              at ModuleJob._link (node:internal/modules/esm/module_job:183:49) {
+            code: 'ERR_MODULE_NOT_FOUND'
+          }
+        }
+      ]
+    }
+  }
+}
+
+Node.js v22.20.0
