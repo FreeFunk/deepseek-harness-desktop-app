@@ -1,11 +1,18 @@
 import { DatabaseSync } from "node:sqlite";
 import { randomUUID, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
 import { mkdirSync } from "node:fs";
+import { readFile } from "node:fs/promises";
+import { serveStatic } from "@deepseek-ai/dsh-host-frontend-static";
+import z from "@deepseek-ai/schemastery";
 
 export const name = "auth";
 export const inject = ["webServer"];
+
+export const Config = z.object({
+  distIndex: z.string().required(),
+});
 
 const dshHome = join(homedir(), ".dsh");
 mkdirSync(dshHome, { recursive: true });
@@ -106,7 +113,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;b
 <form id="f">
 <div class="fg"><label>用户名</label><input type="text" id="u" autocomplete="username" required autofocus></div>
 <div class="fg"><label>密码</label><input type="password" id="p" autocomplete="current-password" required></div>
-<button class="btn">登 录</button>
+<button class="btn">登录</button>
 </form>
 <div id="e" class="err"></div>
 </div>
@@ -116,17 +123,27 @@ document.getElementById("f").addEventListener("submit",async function(e){e.preve
 </body>
 </html>`;
 
-export function apply(ctx) {
+export function apply(ctx, config) {
+  const distIndex = config.distIndex;
+  const distRoot = dirname(distIndex);
+  const renderIndex = async () => ctx.webServer.applyIndexTaps(await readFile(distIndex, "utf8"));
+
   ctx.effect(() => {
     return ctx.webServer.register({
       kind: "exact",
       path: "/login",
       handler: (req, res) => {
+        const user = getUser(req.headers.cookie);
+        if (user) {
+          res.writeHead(302, { Location: "/" });
+          res.end();
+          return;
+        }
         res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
         res.end(LOGIN_HTML);
       }
     });
-  }, "auth: login");
+  }, "auth: 登录页");
 
   ctx.effect(() => {
     return ctx.webServer.register({
@@ -152,7 +169,7 @@ export function apply(ctx) {
         } catch (e) { json(res, 400, { error: e.message }); }
       }
     });
-  }, "auth: login API");
+  }, "auth: 登录接口");
 
   ctx.effect(() => {
     return ctx.webServer.register({
@@ -168,7 +185,7 @@ export function apply(ctx) {
         res.end(JSON.stringify({ ok: true }));
       }
     });
-  }, "auth: logout");
+  }, "auth: 登出");
 
   ctx.effect(() => {
     return ctx.webServer.register({
@@ -180,7 +197,7 @@ export function apply(ctx) {
         json(res, 200, u);
       }
     });
-  }, "auth: me");
+  }, "auth: 当前用户");
 
   ctx.effect(() => {
     return ctx.webServer.register({
@@ -196,5 +213,33 @@ export function apply(ctx) {
         json(res, 200, menus);
       }
     });
-  }, "auth: menus");
+  }, "auth: 菜单权限");
+
+  ctx.effect(() => ctx.webServer.registerFallback(async (req, res) => {
+    const rawPath = new URL(req.url ?? "/", "http://x").pathname;
+    const user = getUser(req.headers.cookie);
+
+    if (!user) {
+      if (rawPath.startsWith("/api/")) {
+        json(res, 401, { error: "未登录" });
+        return;
+      }
+      const accept = req.headers.accept || "";
+      if (accept.includes("text/html")) {
+        res.writeHead(302, { Location: "/login" });
+        res.end();
+        return;
+      }
+      res.writeHead(401, { "Content-Type": "application/json; charset=utf-8" });
+      res.end(JSON.stringify({ error: "未登录" }));
+      return;
+    }
+
+    if (req.method !== "GET" && req.method !== "HEAD") {
+      res.writeHead(405);
+      res.end();
+      return;
+    }
+    await serveStatic(decodeURIComponent(rawPath), res, distRoot, distIndex, renderIndex);
+  }), "auth: 兜底拦截");
 }
