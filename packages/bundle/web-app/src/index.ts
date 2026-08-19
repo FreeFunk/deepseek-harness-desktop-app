@@ -24,8 +24,7 @@ import type {} from '@deepseek-ai/cordis-plugin-loader'
 import type {} from '@deepseek-ai/dsh-host-webserver'
 import type {} from '@deepseek-ai/dsh-system-prompt'
 import type {} from "@deepseek-ai/dsh-shell-env";
-// @ts-expect-error - plain JS plugin has no type declarations; config validated by schemastery
-import * as AuthPlugin from "../../../auth/auth-plugin.js";
+import * as AuthPlugin from "./auth.ts";
 
 /** Stable Cordis plugin name. */
 export const name = 'web-app'
