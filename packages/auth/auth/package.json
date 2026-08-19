@@ -1,4 +1,4 @@
-﻿{
+{
   "name": "@deepseek-ai/dsh-auth",
   "description": "用户认证与权限控制：用户名密码登录、会话管理、菜单权限",
   "version": "0.1.0",
