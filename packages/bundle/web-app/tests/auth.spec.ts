@@ -332,13 +332,17 @@ describe('roles, pages, and the admin console gate', () => {
     expect(consolePage.status).toBe(403)
   })
 
-  it('serves the admin console to an admin', async () => {
+  it('serves the admin console to an admin, themed from the appearance setting', async () => {
     const h = await startHarness()
     await h.login('admin', 'admin123')
     const res = await h.request('/admin', { headers: { accept: 'text/html' } })
     expect(res.status).toBe(200)
     expect(res.body).toContain('管理控制台')
     expect(res.body).toContain('用户管理')
+    // The page carries its own light/dark palettes and the boot-theme script
+    // that toggles the dark palette from the stored appearance preference.
+    expect(res.body).toContain('--auth-bg')
+    expect(res.body).toContain('data-ds-dark-theme')
   })
 })
 
@@ -451,6 +455,11 @@ describe('index bootstrap tap', () => {
     const applied = h.taps.reduce((out, tap) => tap(out), '<head></head><body>shell</body>')
     expect(applied).toContain('window.__DSH_AUTH__')
     expect(applied).toContain('/api/auth/logout')
+    // The user pill is bottom-left, anchored to the sidebar, and themed with
+    // the app's own design tokens so it follows the appearance setting.
+    expect(applied).toContain('dsh-auth-chip')
+    expect(applied).toContain('--dsw-alias-bg-layer-1')
+    expect(applied).toContain('data-side="sidebar"')
   })
 })
 

@@ -22,7 +22,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { randomUUID, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto'
 import { homedir } from 'node:os'
 import { join, dirname } from 'node:path'
-import { mkdirSync } from 'node:fs'
+import { mkdirSync, readFileSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { serveStatic } from '@deepseek-ai/dsh-host-frontend-static'
@@ -680,6 +680,51 @@ function injectBootstrap(html: string): string {
   return `${html}${script}`
 }
 
+/** Built-in appearance preferences, mirroring the ui-theme settings document. */
+type ThemePreference = 'light' | 'dark' | 'system'
+
+/**
+ * Read the persisted appearance preference from the Host user-settings
+ * document (`settings.yaml`, namespace `ui-theme`, field `preference`). The
+ * admin page renders this on every load so it follows the same appearance the
+ * SPA shows. Absent or unparseable documents fall back to `system`.
+ * @param settingsPath - the settings document path (derived from the auth DB's home).
+ * @returns the stored preference, or `system`.
+ */
+function themePreference(settingsPath: string): ThemePreference {
+  try {
+    const text = readFileSync(settingsPath, 'utf8')
+    const section = /^\s*ui-theme:[ \t]*\r?\n([\s\S]*?)(?=^\S[^\n]*:|\z)/m.exec(text)
+    const within = section?.[1] ?? text
+    const pref = /^\s*preference:[ \t]*['"]?(light|dark|system)['"]?[ \t]*$/m.exec(within)
+    if (pref !== null) return pref[1] as ThemePreference
+  } catch {
+    // No document yet — the default applies.
+  }
+  return 'system'
+}
+
+/**
+ * Inline boot-theme script for the standalone admin page, matching the SPA's
+ * own theme bootstrap: it resolves `system` via `prefers-color-scheme`, then
+ * toggles `body[data-ds-dark-theme]` and `color-scheme` so the page CSS flips
+ * to the dark palette exactly when the application would.
+ * @param preference - the persisted appearance preference.
+ * @returns a `<script>` element string.
+ */
+function bootThemeScript(preference: ThemePreference): string {
+  const json = JSON.stringify(preference)
+  return `<script>(() => {
+  const preference = ${json}
+  const systemDark = preference === 'system'
+    && typeof matchMedia !== 'undefined'
+    && matchMedia('(prefers-color-scheme: dark)').matches
+  const dark = preference === 'dark' || systemDark
+  document.documentElement.style.colorScheme = dark ? 'dark' : 'light'
+  document.body.toggleAttribute('data-ds-dark-theme', dark)
+})()</script>`
+}
+
 /**
  * Mount the auth plugin: the transport guard, the auth/admin API, the login
  * and admin-console pages, the SPA bootstrap tap, and static dist serving.
@@ -689,7 +734,9 @@ function injectBootstrap(html: string): string {
 export function apply(ctx: Context, config: Config): void {
   // Resolved lazily so importing the module never touches the home directory
   // (the default is only read when the plugin actually mounts).
-  const store = new AuthStore(config.dbPath ?? join(homedir(), '.dsh', 'auth.db'), config.sessionExpireHours ?? 24)
+  const dbPath = config.dbPath ?? join(homedir(), '.dsh', 'auth.db')
+  const store = new AuthStore(dbPath, config.sessionExpireHours ?? 24)
+  const settingsPath = join(dirname(dbPath), 'settings.yaml')
   const distIndex = config.distIndex
   const distRoot = dirname(distIndex)
   const renderIndex = async (): Promise<string> => ctx.webServer.applyIndexTaps(await readFile(distIndex, 'utf8'))
@@ -948,8 +995,9 @@ export function apply(ctx: Context, config: Config): void {
         + '<p style="margin-top:12px"><a href="/" style="color:#58a6ff">返回首页</a></p></div></body></html>')
       return
     }
+    const html = ADMIN_CONSOLE_HTML.replace('<!--__AUTH_BOOT_THEME__-->', bootThemeScript(themePreference(settingsPath)))
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
-    res.end(ADMIN_CONSOLE_HTML)
+    res.end(html)
   })
 
   ctx.effect(() => ctx.webServer.tapIndex(injectBootstrap), 'auth: bootstrap index tap')
