@@ -24,7 +24,7 @@ vi.mock('node:os', async importOriginal => ({
 
 let dist: string | undefined
 let authRoot: string | undefined
-let authDbPath: string | undefined
+let authDbPath = ''
 
 afterEach(() => {
   vi.restoreAllMocks()
@@ -33,7 +33,7 @@ afterEach(() => {
   dist = undefined
   if (authRoot !== undefined) rmSync(authRoot, { recursive: true, force: true })
   authRoot = undefined
-  authDbPath = undefined
+  authDbPath = ''
 })
 
 const originalResolve = internals.resolveDistIndex
