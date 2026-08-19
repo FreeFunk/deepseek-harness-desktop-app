@@ -193,6 +193,50 @@ describe('real Loader composition', () => {
     await failedUpgradeClosed
     expect(await request(port, '/probe')).toMatchObject({ status: 200, body: 'EXACT' })
 
+    // Guards gate every request before dispatch: a guard that refuses a named
+    // route short-circuits it, delegation reaches the route, and disposal
+    // restores unguarded dispatch. Upgrade dispatch runs the same guards and
+    // destroys the socket when a guard refuses.
+    let guarded = 0
+    const allowAll = server.registerGuard((_target, next) => {
+      guarded += 1
+      return next()
+    })
+    const refuseApi = server.registerGuard((target, next) => {
+      const rawPath = new URL(target.req.url ?? '/', 'http://x').pathname
+      if (rawPath.startsWith('/api/')) {
+        target.res!.writeHead(403)
+        target.res!.end('GUARDED')
+        return
+      }
+      return next()
+    })
+    expect(await request(port, '/api/anything')).toMatchObject({ status: 403, body: 'GUARDED' })
+    expect(await request(port, '/probe')).toMatchObject({ status: 200, body: 'EXACT' })
+    expect(guarded).toBeGreaterThanOrEqual(2)
+    allowAll()
+    refuseApi()
+    expect(await request(port, '/api/anything')).toMatchObject({ status: 200, body: 'API' })
+
+    // Upgrade guard refusal destroys the socket; the same guard set runs there.
+    const refuseUpgrade = server.registerGuard((target) => {
+      if (target.socket !== undefined) target.socket.destroy()
+    })
+    const refused = connect(port, '127.0.0.1')
+    refused.on('error', () => { /* server-side reset is the fixture outcome */ })
+    await once(refused, 'connect')
+    const refusedClosed = once(refused, 'close')
+    refused.write([
+      'GET /events HTTP/1.1',
+      `Host: 127.0.0.1:${String(port)}`,
+      'Connection: Upgrade',
+      'Upgrade: dsh-test',
+      '',
+      '',
+    ].join('\r\n'))
+    await refusedClosed
+    refuseUpgrade()
+
     // Teardown closes both ordinary and upgraded sockets before it resolves.
     await loaded.fiber.dispose()
     expect(upgradedServerClosed).toBe(true)
