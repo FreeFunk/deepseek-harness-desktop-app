@@ -455,11 +455,11 @@ describe('index bootstrap tap', () => {
     const applied = h.taps.reduce((out, tap) => tap(out), '<head></head><body>shell</body>')
     expect(applied).toContain('window.__DSH_AUTH__')
     expect(applied).toContain('/api/auth/logout')
-    // The user pill is bottom-left, anchored to the sidebar, and themed with
-    // the app's own design tokens so it follows the appearance setting.
+    // The user trigger adopts the sidebar Settings footprint, is themed with
+    // the app's own design tokens, and offers the auth menu from that anchor.
     expect(applied).toContain('dsh-auth-chip')
     expect(applied).toContain('--dsw-alias-bg-layer-1')
-    expect(applied).toContain('data-side="sidebar"')
+    expect(applied).toContain('data-dsh-auth-settings-trigger')
   })
 })
 

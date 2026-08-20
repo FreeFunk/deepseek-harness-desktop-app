@@ -146,6 +146,8 @@ export function SettingsRoot(props: SettingsRootComponentProps) {
         className={clsx(css.trigger, !wide && css.rail)}
         aria-haspopup="dialog"
         aria-expanded={open}
+        data-dsh-auth-settings-trigger=""
+        data-dsh-settings-wide={wide ? 'true' : 'false'}
         onClick={() => { setOpen(true) }}
       >
         {renderSlot('settings.trigger', { wide })}
