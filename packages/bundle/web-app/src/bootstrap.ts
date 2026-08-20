@@ -48,7 +48,7 @@ export const AUTH_BOOTSTRAP_SCRIPT = `(function(){
     + '#dsh-auth-trigger:hover{background:var(--dsw-alias-interactive-bg-hover,rgba(0,0,0,0.06))}'
     + '#dsh-auth-trigger[data-wide="false"]{justify-content:center;padding:0;border-radius:50%;text-align:center}'
     + 'body[data-ds-dark-theme] #dsh-auth-trigger{color:var(--dsw-static-neutral-bluish-50,#f9fafb);box-shadow:0 1px 3px rgba(0,0,0,0.5)}'
-    + '#dsh-auth-menu{position:fixed;z-index:1001;min-width:170px;background:var(--dsw-alias-bg-layer-2,#ffffff);border:1px solid var(--dsw-alias-border-l3,rgba(0,0,0,0.12));border-radius:8px;padding:4px;display:none;box-shadow:0 8px 24px rgba(0,0,0,0.18)}'
+    + '#dsh-auth-menu{position:fixed;z-index:1001;min-width:170px;box-sizing:border-box;background:var(--dsw-alias-bg-layer-2,#ffffff);border:1px solid var(--dsw-alias-border-l3,rgba(0,0,0,0.12));border-radius:8px;padding:4px;display:none;box-shadow:0 8px 24px rgba(0,0,0,0.18)}'
     + 'body[data-ds-dark-theme] #dsh-auth-menu{box-shadow:0 8px 24px rgba(0,0,0,0.5)}'
     + '#dsh-auth-menu button{display:block;width:100%;text-align:left;background:none;border:none;color:var(--dsw-static-neutral-bluish-1000,#0f1115);padding:7px 10px;border-radius:6px;cursor:pointer;font:inherit}'
     + 'body[data-ds-dark-theme] #dsh-auth-menu button{color:var(--dsw-static-neutral-bluish-50,#f9fafb)}'
@@ -82,12 +82,19 @@ export const AUTH_BOOTSTRAP_SCRIPT = `(function(){
     return role ? name + ' / ' + role : name
   }
 
+  function sidebarColumnRect(){
+    var col = document.querySelector('[data-sidebar-col]')
+    if (col) return col.getBoundingClientRect()
+    var trigger = settingsTrigger()
+    return trigger ? trigger.getBoundingClientRect() : null
+  }
+
   function setMenuOpen(open){
     UI.open = open
     if (UI.menu === null || UI.triggerButton === null) return
     UI.menu.style.display = open ? 'block' : 'none'
     UI.triggerButton.setAttribute('aria-expanded', open ? 'true' : 'false')
-    if (open) positionUI(true)
+    if (open) positionUI()
   }
 
   function closeMenu(){
@@ -98,8 +105,10 @@ export const AUTH_BOOTSTRAP_SCRIPT = `(function(){
     var trigger = settingsTrigger()
     if (UI.menu === null || trigger === null || !UI.open) return
     var rect = trigger.getBoundingClientRect()
-    var width = UI.menu.offsetWidth || 170
-    var left = Math.max(8, Math.min(rect.left + rect.width - width, window.innerWidth - width - 8))
+    var col = sidebarColumnRect()
+    var width = col && col.width > 0 ? col.width : (UI.menu.offsetWidth || 170)
+    var left = col ? col.left : Math.max(8, Math.min(rect.left + rect.width - width, window.innerWidth - width - 8))
+    UI.menu.style.width = width + 'px'
     UI.menu.style.left = left + 'px'
     UI.menu.style.top = 'auto'
     UI.menu.style.bottom = Math.max(8, window.innerHeight - rect.top + 6) + 'px'
@@ -142,7 +151,7 @@ export const AUTH_BOOTSTRAP_SCRIPT = `(function(){
     }
   }
 
-  function positionUI(force){
+  function positionUI(){
     var trigger = settingsTrigger()
     if (trigger === null || UI.root === null) return
     var rect = trigger.getBoundingClientRect()
@@ -155,21 +164,21 @@ export const AUTH_BOOTSTRAP_SCRIPT = `(function(){
     var button = UI.root.querySelector('#dsh-auth-trigger')
     if (button) button.style.borderRadius = trigger.getAttribute('data-dsh-settings-wide') === 'true' ? '12px' : '50%'
     positionMenu()
-    if (force) refreshTrigger()
+    refreshTrigger()
   }
 
   var positionScheduled = false
   function schedulePosition(){
     if (positionScheduled) return
     positionScheduled = true
-    requestAnimationFrame(function(){ positionScheduled = false; positionUI(false) })
+    requestAnimationFrame(function(){ positionScheduled = false; positionUI() })
   }
 
   function mountAccountUI(){
     var trigger = settingsTrigger()
     if (!document.body || trigger === null) return
     if (UI.root !== null && UI.anchor === trigger){
-      positionUI(true)
+      positionUI()
       return
     }
     if (UI.root !== null) UI.root.remove()
@@ -200,12 +209,12 @@ export const AUTH_BOOTSTRAP_SCRIPT = `(function(){
       if (e.target !== button && !menu.contains(e.target)) closeMenu()
     })
     refreshMenu()
-    positionUI(true)
+    positionUI()
     window.addEventListener('resize', schedulePosition)
     if (window.MutationObserver){
       new MutationObserver(function(){
-        schedulePosition()
-        if (settingsTrigger() !== UI.anchor) mountAccountUI()
+      schedulePosition()
+      if (settingsTrigger() !== UI.anchor) mountAccountUI()
       })
         .observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-dsh-settings-wide', 'class', 'style'] })
     }
