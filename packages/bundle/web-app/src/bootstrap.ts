@@ -53,6 +53,8 @@ export const AUTH_BOOTSTRAP_SCRIPT = `(function(){
     + '#dsh-auth-menu button{display:block;width:100%;text-align:left;background:none;border:none;color:var(--dsw-static-neutral-bluish-1000,#0f1115);padding:7px 10px;border-radius:6px;cursor:pointer;font:inherit}'
     + 'body[data-ds-dark-theme] #dsh-auth-menu button{color:var(--dsw-static-neutral-bluish-50,#f9fafb)}'
     + '#dsh-auth-menu button:hover{background:var(--dsw-alias-interactive-bg-hover,rgba(0,0,0,0.06))}'
+    + '#dsh-auth-menu .dsh-auth-user{display:block;padding:7px 10px;margin-bottom:2px;border-bottom:1px solid var(--dsw-alias-border-l3,rgba(0,0,0,0.08));color:var(--dsw-static-neutral-bluish-1000,#0f1115);font-weight:600;white-space:nowrap}'
+    + 'body[data-ds-dark-theme] #dsh-auth-menu .dsh-auth-user{color:var(--dsw-static-neutral-bluish-50,#f9fafb)}'
   document.head.appendChild(style)
 
   var UI = {
@@ -117,10 +119,14 @@ export const AUTH_BOOTSTRAP_SCRIPT = `(function(){
   function refreshMenu(){
     if (UI.menu === null) return
     UI.menu.textContent = ''
+    var userRow = el('div', { class: 'dsh-auth-user' }, '')
+    var role = UI.me && UI.me.role && UI.me.role.label ? UI.me.role.label : ''
+    userRow.textContent = accountName(UI.me) + (role ? ' / ' + role : '')
+    UI.menu.appendChild(userRow)
     var items = []
+    if (UI.pages['settings']) items.push(['设置', function(){ closeMenu(); var trigger = settingsTrigger(); if (trigger) trigger.click() }])
     if (UI.pages['admin']) items.push(['用户权限', function(){ location.href = '/admin' }])
     items.push(['修改密码', function(){ location.href = '/admin#password' }])
-    if (UI.pages['settings']) items.push(['设置', function(){ closeMenu(); var trigger = settingsTrigger(); if (trigger) trigger.click() }])
     items.push(['退出登录', function(){
       fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' })
         .then(function(){ location.href = '/login' })
@@ -170,6 +176,7 @@ export const AUTH_BOOTSTRAP_SCRIPT = `(function(){
     if (UI.menu !== null) UI.menu.remove()
     UI.anchor = trigger
     UI.open = false
+    trigger.style.opacity = '0'
     trigger.style.pointerEvents = 'none'
     var root = el('div', { id: 'dsh-auth-chip' }, '')
     var button = el('button', { id: 'dsh-auth-trigger', type: 'button', 'aria-haspopup': 'menu', 'aria-expanded': 'false' }, '')
@@ -182,6 +189,13 @@ export const AUTH_BOOTSTRAP_SCRIPT = `(function(){
     UI.triggerButton = button
     UI.menu = menu
     button.onclick = function(){ setMenuOpen(!UI.open) }
+    var closeTimer = null
+    function cancelClose(){ clearTimeout(closeTimer); closeTimer = null }
+    function scheduleClose(){ cancelClose(); closeTimer = setTimeout(closeMenu, 250) }
+    button.addEventListener('mouseenter', function(){ cancelClose(); setMenuOpen(true) })
+    button.addEventListener('mouseleave', scheduleClose)
+    menu.addEventListener('mouseenter', cancelClose)
+    menu.addEventListener('mouseleave', scheduleClose)
     document.addEventListener('click', function(e){
       if (e.target !== button && !menu.contains(e.target)) closeMenu()
     })
