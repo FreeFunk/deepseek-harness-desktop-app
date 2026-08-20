@@ -84,6 +84,8 @@ describe('SettingsRoot trigger', () => {
     const { renderSlot } = mount()
     const trigger = screen.getByRole('button', { name: 'Settings' })
     expect(trigger.hasAttribute('aria-label')).toBe(false)
+    expect(trigger.getAttribute('data-dsh-auth-settings-trigger')).toBe('')
+    expect(trigger.getAttribute('data-dsh-settings-wide')).toBe('true')
     expect(renderSlot).toHaveBeenCalledWith('settings.trigger', { wide: true })
     expect(trigger.getAttribute('aria-expanded')).toBe('false')
     fireEvent.click(trigger)
