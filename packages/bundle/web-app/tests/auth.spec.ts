@@ -64,6 +64,7 @@ function fakeWebServer(): Captured {
         }
       },
       applyIndexTaps: (html: string) => captured.taps.reduce((out, tap) => tap(out), html),
+      renderIndex: (html: string) => captured.taps.reduce((out, tap) => tap(out), html),
     } as unknown as WebServer,
   }
   return captured

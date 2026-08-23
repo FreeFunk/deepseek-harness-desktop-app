@@ -739,7 +739,7 @@ export function apply(ctx: Context, config: Config): void {
   const settingsPath = join(dirname(dbPath), 'settings.yaml')
   const distIndex = config.distIndex
   const distRoot = dirname(distIndex)
-  const renderIndex = async (): Promise<string> => ctx.webServer.applyIndexTaps(await readFile(distIndex, 'utf8'))
+  const renderIndex = async (): Promise<string> => ctx.webServer.renderIndex(await readFile(distIndex, 'utf8'))
   const getSession = (req: IncomingMessage): AuthUser | null => store.getUserByToken(tokenFromCookie(req.headers.cookie))
 
   ctx.effect(() => () => { store.dispose() }, 'auth: database')
