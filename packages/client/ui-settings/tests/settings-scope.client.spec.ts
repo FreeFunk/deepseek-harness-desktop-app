@@ -56,6 +56,23 @@ function deferred<T>() {
   return { promise, resolve, reject }
 }
 
+/** Mutable availability signal for tests. */
+function availability(initial: boolean) {
+  let value = initial
+  const listeners = new Set<() => void>()
+  return {
+    getSnapshot: () => value,
+    subscribe: (listener: () => void) => {
+      listeners.add(listener)
+      return () => { listeners.delete(listener) }
+    },
+    set(next: boolean) {
+      value = next
+      for (const listener of [...listeners]) listener()
+    },
+  }
+}
+
 /** A host-mode mirror plus a controller derived from it, over one fake wire. */
 function derivedScope(
   api: { describe?: ReturnType<typeof vi.fn>; mutate?: ReturnType<typeof vi.fn> },
@@ -471,5 +488,23 @@ describe('SettingsScopeBinder.bind', () => {
     expect(scope.getSnapshot()).toMatchObject({ status: 'unavailable', mode: 'memory', writable: false })
     await fiber.dispose()
     expect(describeCall).not.toHaveBeenCalled()
+  })
+  it('flips a remote scope to host once availability enables and the mirror loads', async () => {
+    const signal = availability(false)
+    const api = { describe: vi.fn().mockResolvedValue(described({ preference: 'dark' }, 1)) }
+    const wire = { settings: api } as never
+    const mirror = new SettingsDescribeMirror(wire, 'memory', signal)
+    const scope = new SettingsScopeController<UiTestSettings>(
+      wire,
+      { namespace: 'ui-test' },
+      mirror,
+      'memory',
+      settingsSchema,
+      signal,
+    )
+    expect(scope.getSnapshot()).toMatchObject({ status: 'unavailable', mode: 'memory' })
+    signal.set(true)
+    await vi.waitFor(() => { expect(scope.getSnapshot().status).toBe('ready') })
+    expect(scope.getSnapshot()).toMatchObject({ mode: 'host', value: { preference: 'dark' } })
   })
 })

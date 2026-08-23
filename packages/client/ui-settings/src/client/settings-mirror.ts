@@ -11,6 +11,7 @@
 
 import type { IApiClient, SettingsNamespaceView } from '@deepseek-ai/dsh-api-remotes/client'
 import { createSnapshotStore, type SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
+import type { SettingsAvailability } from './settings-availability.ts'
 
 type SettingsFace = Pick<IApiClient, 'settings'>
 
@@ -79,17 +80,31 @@ export class SettingsDescribeMirror implements SettingsDescribeFace {
 
   /**
    * @param api - settings wire face.
-   * @param persistence - remote browsers stay process-local because settings RPCs are loopback-only.
+   * @param persistence - fallback mode when no availability signal is given; remote browsers stay process-local.
+   * @param availability - optional live signal overriding the fallback: loopback is always host, remote only on session permission.
    */
   constructor(
     private readonly api: SettingsFace,
     private readonly persistence: 'host' | 'memory' = 'host',
+    private readonly availability?: SettingsAvailability,
   ) {
     this.store = createSnapshotStore<SettingsMirrorSnapshot>({
-      status: persistence === 'host' ? 'idle' : 'unavailable',
+      status: this.mode() === 'host' ? 'idle' : 'unavailable',
       view: undefined,
       error: null,
     })
+    if (this.availability !== undefined) {
+      // A remote session resolving after startup flips availability; re-read so
+      // the held view (and every derived scope) catches up.
+      this.availability.subscribe(() => { void this.load() })
+    }
+  }
+
+  /** The effective mode: an availability signal overrides the static fallback. */
+  private mode(): 'host' | 'memory' {
+    return this.availability === undefined
+      ? this.persistence
+      : (this.availability.getSnapshot() ? 'host' : 'memory')
   }
 
   /** @returns the current sync snapshot (stable reference until the next change). */
@@ -112,7 +127,7 @@ export class SettingsDescribeMirror implements SettingsDescribeFace {
    * @returns settlement after this call's freshness is reflected.
    */
   load(): Promise<void> {
-    if (this.persistence === 'memory') return Promise.resolve()
+    if (this.mode() === 'memory') return Promise.resolve()
     if (this.inFlight !== undefined) {
       this.rerun = true
       return this.inFlight
@@ -130,7 +145,7 @@ export class SettingsDescribeMirror implements SettingsDescribeFace {
    * @returns settlement of the current or newly started read, if any.
    */
   ensure(): Promise<void> {
-    if (this.persistence === 'memory') return Promise.resolve()
+    if (this.mode() === 'memory') return Promise.resolve()
     if (this.inFlight !== undefined) return this.inFlight
     if (this.getSnapshot().status === 'idle') return this.load()
     return Promise.resolve()

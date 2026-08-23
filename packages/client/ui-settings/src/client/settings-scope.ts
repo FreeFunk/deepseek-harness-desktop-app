@@ -35,6 +35,7 @@ import type {} from '@deepseek-ai/dsh-api-remotes/types'
 import type {} from '@deepseek-ai/dsh-settings/types'
 import type { SettingsSchemaService } from './schema.ts'
 import { SettingsDescribeMirror, type SettingsDescribeFace } from './settings-mirror.ts'
+import type { SettingsAvailability } from './settings-availability.ts'
 
 type SettingsFace = Pick<IApiClient, 'settings'>
 
@@ -50,6 +51,7 @@ export class SettingsScopeController<T> implements SettingsScope<T> {
   private writeGeneration = 0
   private disposed = false
   private readonly unsubscribe: (() => void) | undefined
+  private readonly unsubscribeAvailability: (() => void) | undefined
   /**
    * Revision answered by a superseded write still ahead of the mirror: the
    * mirror only folds the LATEST settlement in, so a queued successor takes
@@ -61,8 +63,9 @@ export class SettingsScopeController<T> implements SettingsScope<T> {
    * @param api - settings wire face (writes only; reads ride the mirror).
    * @param spec - namespace identity and optional narrowing decoder.
    * @param mirror - the shared describe mirror this scope derives from.
-   * @param persistence - remote browsers remain process-local because settings RPCs are loopback-only.
+   * @param persistence - fallback mode when no availability signal is given; remote browsers stay process-local.
    * @param schema - settings-owned schema operations.
+   * @param availability - optional live signal overriding the fallback: loopback is always host, remote only on session permission.
    */
   constructor(
     private readonly api: SettingsFace,
@@ -70,20 +73,29 @@ export class SettingsScopeController<T> implements SettingsScope<T> {
     private readonly mirror: SettingsDescribeMirror,
     private readonly persistence: 'host' | 'memory',
     private readonly schema: SettingsSchemaService,
+    private readonly availability?: SettingsAvailability,
   ) {
     this.store = createSnapshotStore<SettingsScopeSnapshot<T>>({
-      status: persistence === 'host' ? 'loading' : 'unavailable',
+      status: this.mode() === 'host' ? 'loading' : 'unavailable',
       value: undefined,
       base: undefined,
       user: undefined,
       revision: undefined,
       writable: false,
-      mode: persistence,
+      mode: this.mode(),
     })
-    if (persistence === 'host') {
+    if (this.persistence === 'host' || this.availability !== undefined) {
       this.unsubscribe = mirror.subscribe(() => { this.derive() })
+      this.unsubscribeAvailability = this.availability?.subscribe(() => { this.derive() })
       this.derive()
     }
+  }
+
+  /** The effective mode: an availability signal overrides the static fallback. */
+  private mode(): 'host' | 'memory' {
+    return this.availability === undefined
+      ? this.persistence
+      : (this.availability.getSnapshot() ? 'host' : 'memory')
   }
 
   /** @returns the current sync snapshot (stable reference until the next change). */
@@ -166,11 +178,12 @@ export class SettingsScopeController<T> implements SettingsScope<T> {
     this.disposed = true
     this.writeGeneration += 1
     this.unsubscribe?.()
+    this.unsubscribeAvailability?.()
     await this.tail
   }
 
   private enqueue(operation: () => Promise<void>): Promise<void> {
-    if (this.persistence === 'memory' || this.disposed) return Promise.resolve()
+    if (this.mode() === 'memory' || this.disposed) return Promise.resolve()
     const task = this.tail.then(async () => {
       if (this.disposed) return
       await operation()
@@ -183,6 +196,7 @@ export class SettingsScopeController<T> implements SettingsScope<T> {
 
   private derive(): void {
     if (this.disposed) return
+    this.store.update((draft) => { draft.mode = this.mode() })
     const mirrored = this.mirror.getSnapshot()
     if (mirrored.view === undefined) return
     const { writable } = mirrored.view
@@ -239,16 +253,21 @@ declare module '@deepseek-ai/cordis' {
 export class SettingsScopeBinder extends Service {
   private readonly mirror: SettingsDescribeMirror
   private readonly schema: SettingsSchemaService
+  private readonly availability: SettingsAvailability | undefined
 
   /**
    * @param ctx - the providing plugin's context.
    * @param config - the shared describe mirror every bound scope derives from,
    * plus the settings-owned schema operations.
    */
-  constructor(ctx: Context, config: { mirror: SettingsDescribeMirror; schema: SettingsSchemaService }) {
+  constructor(
+    ctx: Context,
+    config: { mirror: SettingsDescribeMirror; schema: SettingsSchemaService; availability?: SettingsAvailability },
+  ) {
     super(ctx, 'settingsScope')
     this.mirror = config.mirror
     this.schema = config.schema
+    this.availability = config.availability
   }
 
   /**
@@ -281,6 +300,7 @@ export class SettingsScopeBinder extends Service {
       this.mirror,
       connection.isLoopback ? 'host' : 'memory',
       this.schema,
+      this.availability,
     )
     ctx.effect(() => {
       void this.mirror.ensure()

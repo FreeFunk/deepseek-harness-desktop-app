@@ -15,5 +15,5 @@ None; this package neither assembles nor sends a provider request.
 
 ## Known Limitations and Deferred Work
 
-- **Remote browsers get no durable settings** — the settings RPCs are loopback-only, so a scope bound in a non-loopback browser starts `unavailable` and never crosses the wire; every row it backs is inert there.
+- **Remote settings need the settings permission** — a non-loopback browser follows its authenticated session: the mirror enables only once the session (published by the web-app auth bootstrap as `window.__DSH_AUTH__` and the `dsh-auth` event) carries `page:settings`, while a loopback page always has it. Without either, a scope bound in that browser starts `unavailable` and never crosses the wire; every row it backs is inert there.
 - **One field per write** — `set` sends a single `set` op, so a row that must move two fields together has no transaction and publishes two revisions.

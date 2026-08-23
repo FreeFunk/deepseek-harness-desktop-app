@@ -30,6 +30,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { WebGuard } from '@deepseek-ai/dsh-host-webserver'
 import type {} from '@deepseek-ai/dsh-host-webserver'
 import z from '@deepseek-ai/schemastery'
+import { AUTH_USER } from '@deepseek-ai/dsh-host-webserver'
 import { ADMIN_CONSOLE_HTML } from './admin-console.ts'
 import { AUTH_BOOTSTRAP_SCRIPT } from './bootstrap.ts'
 
@@ -754,7 +755,11 @@ export function apply(ctx: Context, config: Config): void {
       return next()
     }
     const user = getSession(target.req)
-    if (user !== null) return next()
+    if (user !== null) {
+      // Attach the session for downstream fences (the connection configuration-plane gate).
+      ;(target.req as unknown as Record<PropertyKey, unknown>)[AUTH_USER] = user
+      return next()
+    }
     if (target.socket !== undefined) { target.socket.destroy(); return }
     if (target.res !== undefined) {
       if (path.startsWith('/api/')) { json(target.res, 401, { error: '未登录' }); return }

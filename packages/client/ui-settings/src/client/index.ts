@@ -21,6 +21,7 @@ import type {} from '@deepseek-ai/dsh-settings/types'
 import { SettingsSchemaService } from './schema.ts'
 import { SettingsScopeBinder } from './settings-scope.ts'
 import { SettingsDescribeMirror } from './settings-mirror.ts'
+import { createSettingsAvailability } from './settings-availability.ts'
 
 export type {
   SettingsGeneralItemOwnerProps, SettingsHeaderOwnerProps, SettingsOnboardingOwnerProps,
@@ -49,9 +50,11 @@ export const inject = ['connection', 'remote']
 export function apply(ctx: ClientContext): void {
   const schema = new SettingsSchemaService(ctx)
   const connection = ctx.get('connection') as ConnectionHandle
+  const availability = createSettingsAvailability(connection.isLoopback)
   const mirror = new SettingsDescribeMirror(
     connection.api,
     connection.isLoopback ? 'host' : 'memory',
+    availability,
   )
   ctx.effect(() => {
     const disposers = [
@@ -65,5 +68,5 @@ export function apply(ctx: ClientContext): void {
     void mirror.ensure()
     return () => { for (const dispose of disposers) dispose() }
   }, 'ui-settings: describe mirror invalidations')
-  new SettingsScopeBinder(ctx, { mirror, schema })
+  new SettingsScopeBinder(ctx, { mirror, schema, availability })
 }

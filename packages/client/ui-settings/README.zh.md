@@ -15,5 +15,5 @@
 
 ## 已知限制与暂缓事项
 
-- **远程浏览器没有持久化设置**：设置 RPC 仅限 loopback，因此在非 loopback 浏览器中绑定的 scope 以 `unavailable` 起步且从不跨线路，它支撑的每一行在那里都是无效的。
+- **远程设置需要设置权限**：非 loopback 浏览器跟随其已认证会话——镜像只有在会话（由 web-app 认证 bootstrap 以 `window.__DSH_AUTH__` 与 `dsh-auth` 事件发布）携带 `page:settings` 时才启用，回环页面则始终可用。二者皆无时，该浏览器中绑定的 scope 以 `unavailable` 起步且从不跨线路，它支撑的每一行在那里都是无效的。
 - **每次写入仅一个字段**：`set` 只发送单个 `set` op，因此需要同时改动两个字段的行没有事务可用，会发布两个 revision。

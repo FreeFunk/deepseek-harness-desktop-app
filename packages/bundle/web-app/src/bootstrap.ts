@@ -220,8 +220,10 @@ export const AUTH_BOOTSTRAP_SCRIPT = `(function(){
     }
   }
 
+  try { window.__DSH_AUTH__ = null } catch (e) { /* signal simply stays absent */ }
   fetchJSON('/api/auth/me').then(function(me){
     window.__DSH_AUTH__ = me
+    try { window.dispatchEvent(new CustomEvent('dsh-auth', { detail: me })) } catch (e) { /* consumers read __DSH_AUTH__ on their own schedule */ }
     var perms = me && me.permissions ? me.permissions : []
     var pages = {}
     for (var i = 0; i < perms.length; i++) if (perms[i].indexOf('page:') === 0) pages[perms[i].slice(5)] = true

@@ -18,6 +18,7 @@ import { renderIndexInjections, type IndexInjection } from './injections.ts'
 
 export { renderIndexInjections } from './injections.ts'
 export type { IndexInjection, IndexInjectionPlacement } from './injections.ts'
+export { AUTH_USER, type AuthUserFace, authUserOf } from './request-auth.ts'
 
 declare module '@deepseek-ai/cordis' {
   interface Context {

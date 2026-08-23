@@ -11,6 +11,7 @@ import type { AttachmentStore } from '@deepseek-ai/dsh-attachment'
 import { RpcId, type ClientRequest } from '@deepseek-ai/dsh-host-apiproxy/api'
 import type { WebServer, WebRoute, WebUpgradeRoute } from '@deepseek-ai/dsh-host-webserver'
 import { API_PATH, apply, HOST_EVENTS_PATH, inject, MUX_EVENTS_PATH, type HostConnectionHandle } from '../src/index.ts'
+import { AUTH_USER } from '@deepseek-ai/dsh-host-webserver'
 import { DEFAULT_MAX_REQUEST_BODY_BYTES } from '../src/http-bridge.ts'
 
 /** Structural webServer fake recording both route registries. */
@@ -54,6 +55,12 @@ function fakeRawPost(headers: Record<string, string>, url: string, body: string)
   const request = Readable.from([Buffer.from(body)]) as unknown as IncomingMessage
   Object.assign(request, { url, method: 'POST', headers })
   return request
+}
+
+/** Attach a session user to a fake request, as the auth guard would. */
+function withSession(req: IncomingMessage, permissions: string[]): IncomingMessage {
+  ;(req as unknown as Record<PropertyKey, unknown>)[AUTH_USER] = { permissions }
+  return req
 }
 
 /** Response recorder compatible with both the fence's short-circuit and the bridge. */
@@ -195,6 +202,67 @@ describe('connection node half', () => {
     const read = fakeResponse()
     await routes[0]!.handler(fakeRequest({ host: 'harness.example' }), read.response)
     expect(read.state.status).not.toBe(403)
+    await dispose()
+  })
+
+  it('allows configuration-plane methods for a session that carries the settings permission', async () => {
+    const { routes, dispose } = await mounted({ trustedHosts: ['harness.example'] })
+    for (const method of [
+      'settings.describe', 'settings.update', 'settings.replace', 'settings.mutate',
+      'credentials.describe', 'credentials.set', 'credentials.unset',
+      'llm.discoverModels',
+    ]) {
+      const allowed = fakeResponse()
+      await routes[0]!.handler(
+        withSession(fakeRequest({ host: 'harness.example' }, `${API_PATH}/${method}`), ['page:settings']),
+        allowed.response,
+      )
+      expect(allowed.state.status).not.toBe(403)
+    }
+    await dispose()
+  })
+
+  it('refuses configuration-plane methods for a session without the settings permission', async () => {
+    const { routes, dispose } = await mounted({ trustedHosts: ['harness.example'] })
+    const denied = fakeResponse()
+    await routes[0]!.handler(
+      withSession(fakeRequest({ host: 'harness.example' }, `${API_PATH}/settings.describe`), ['page:chat']),
+      denied.response,
+    )
+    expect(denied.state.status).toBe(403)
+    expect(denied.state.body).toBe('forbidden')
+    await dispose()
+  })
+
+  it('enforces the settings permission even when a reverse proxy rewrites Host to loopback', async () => {
+    const { routes, dispose } = await mounted({ trustedHosts: ['harness.example'] })
+    const denied = fakeResponse()
+    await routes[0]!.handler(
+      withSession(fakeRequest({ host: '127.0.0.1:3080' }, `${API_PATH}/settings.describe`), ['page:chat']),
+      denied.response,
+    )
+    expect(denied.state.status).toBe(403)
+    expect(denied.state.body).toBe('forbidden')
+    const allowed = fakeResponse()
+    await routes[0]!.handler(
+      withSession(fakeRequest({ host: '127.0.0.1:3080' }, `${API_PATH}/settings.describe`), ['page:settings']),
+      allowed.response,
+    )
+    expect(allowed.state.status).not.toBe(403)
+    await dispose()
+  })
+
+  it('keeps native methods loopback-only even for a session with the settings permission', async () => {
+    const { routes, dispose } = await mounted({ trustedHosts: ['harness.example'] })
+    for (const method of ['host.pickDirectory', 'host.openPath', 'settings.openDocument', 'agentPreset.read']) {
+      const denied = fakeResponse()
+      await routes[0]!.handler(
+        withSession(fakeRequest({ host: 'harness.example' }, `${API_PATH}/${method}`), ['page:settings']),
+        denied.response,
+      )
+      expect(denied.state.status).toBe(403)
+      expect(denied.state.body).toBe('forbidden')
+    }
     await dispose()
   })
 

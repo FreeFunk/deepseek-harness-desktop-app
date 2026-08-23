@@ -32,6 +32,23 @@ function deferred<T>() {
   return { promise, resolve }
 }
 
+/** Mutable availability signal for tests. */
+function availability(initial: boolean) {
+  let value = initial
+  const listeners = new Set<() => void>()
+  return {
+    getSnapshot: () => value,
+    subscribe: (listener: () => void) => {
+      listeners.add(listener)
+      return () => { listeners.delete(listener) }
+    },
+    set(next: boolean) {
+      value = next
+      for (const listener of [...listeners]) listener()
+    },
+  }
+}
+
 describe('SettingsDescribeMirror', () => {
   it('folds loads before the wire read into it, and mid-flight loads into one rerun', async () => {
     const gate = deferred<RpcResponse<SettingsDescribeView>>()
@@ -212,5 +229,31 @@ describe('SettingsDescribeMirror', () => {
     await loading
     expect(describeCall).toHaveBeenCalledTimes(2)
     expect(mirror.namespace('theme')?.revision).toBe(2)
+  })
+  it('stays unavailable while the availability signal is false', async () => {
+    const describeCall = vi.fn()
+    const mirror = new SettingsDescribeMirror({ settings: { describe: describeCall } } as never, 'memory', availability(false))
+    await mirror.ensure()
+    await mirror.load()
+    expect(mirror.getSnapshot()).toEqual({ status: 'unavailable', view: undefined, error: null })
+    expect(describeCall).not.toHaveBeenCalled()
+  })
+
+  it('treats an always-available signal like host persistence', async () => {
+    const describeCall = vi.fn().mockResolvedValue(described([view('theme', 1)]))
+    const mirror = new SettingsDescribeMirror({ settings: { describe: describeCall } } as never, 'memory', availability(true))
+    await mirror.ensure()
+    expect(mirror.getSnapshot().status).toBe('ready')
+  })
+
+  it('flips from unavailable to ready when an availability signal enables a remote session', async () => {
+    const describeCall = vi.fn().mockResolvedValue(described([view('theme', 3)]))
+    const signal = availability(false)
+    const mirror = new SettingsDescribeMirror({ settings: { describe: describeCall } } as never, 'memory', signal)
+    expect(mirror.getSnapshot()).toEqual({ status: 'unavailable', view: undefined, error: null })
+    signal.set(true)
+    await vi.waitFor(() => { expect(mirror.getSnapshot().status).toBe('ready') })
+    expect(mirror.namespace('theme')?.revision).toBe(3)
+    expect(describeCall).toHaveBeenCalledTimes(1)
   })
 })

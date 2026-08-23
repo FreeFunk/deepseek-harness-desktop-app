@@ -1,4 +1,5 @@
 /** Host HTTP bridge for browser-client RPC. */
+import type { IncomingMessage } from 'node:http'
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-attachment'
@@ -10,6 +11,7 @@ import { bridge, DEFAULT_MAX_REQUEST_BODY_BYTES } from './http-bridge.ts'
 import { assertTrustedAuthority, isTrustedApiRequest } from './api-request-trust.ts'
 import { HostConnectionService } from './rpc-host.ts'
 import { rejectWebSocketUpgrade, WebSocketDownlinks } from './websocket-downlink.ts'
+import { authUserOf } from '@deepseek-ai/dsh-host-webserver'
 
 export type {
   ConnectionRpcAuthority,
@@ -67,48 +69,53 @@ export const Config: z<ConnectionConfig> = z.object({
 })
 
 /**
- * Methods gated to loopback even on a trusted-host deployment. Native dialogs
- * act on the host machine; the settings and credential domains mutate the
- * user's configuration and secret store, and READING them is equally
- * privileged — `settings.describe` returns every exposed namespace's
- * configuration and `credentials.describe` reports whether an arbitrary
- * environment-variable name is configured and where from, which is
- * reconnaissance no anonymous caller should have. `trustedHosts` is a
- * DNS-rebinding fence, explicitly not authentication, so the whole
- * configuration plane stays loopback-same-origin until a real authentication
- * layer exists. `llm.discoverModels` belongs to that plane on both counts: it
- * carries a draft credential, and it makes the HOST issue a GET to a URL the
- * caller chose and reports back the status or the parsed body — an anonymous
- * LAN caller would have a probe for whatever the host can reach and the
- * browser cannot.
+ * Methods that act on the Host machine's desktop or manage the session roster.
+ * Native dialogs open windows on the host; a preset composition names the
+ * plugins a session runs, so reading one is reconnaissance and
+ * copy/remove/openDocument rearrange what the deployment offers. These stay
+ * loopback-same-origin even with a session: `trustedHosts` is a
+ * DNS-rebinding fence, explicitly not authentication, so nothing here is
+ * reachable from a remote origin.
  *
- * The model catalog (`llm.providers`, `llm.models`) is deliberately NOT here:
- * it carries provider ids, display names, and model lists — no endpoints,
- * keys, or key state — and a LAN client's model picker legitimately needs it.
+ * (Choosing a preset is not pinned, and `agentPreset.list` is not either:
+ * `session.create` already takes an `agentPreset`, so pinning only the switch
+ * would leave the same capability one method over, and the deployment's own
+ * default already carries `bash` and the filesystem tools, so any caller that
+ * may start a session can already run commands as this process. Pinning the
+ * switch would be a fence beside an open gate.)
  */
-const PRIVILEGED_METHODS = new Set([
-  // A preset composition names the plugins a session runs, so reading one is
-  // reconnaissance; copy and remove rearrange what the deployment offers, and
-  // openDocument drives the host desktop — all more than the roster beside
-  // them. (Authoring is copy-only, so no method here accepts composition text
-  // or a path; the pin is about who may manage the roster at all.)
-  //
-  // CHOOSING one is not pinned, and `agentPreset.list` is not either. Picking a
-  // preset looks like escalation — one of them mounts the toolset that edits the
-  // live runtime — but `session.create` already takes an `agentPreset`, so
-  // pinning only the switch would leave the same capability one method over.
-  // The deeper reason is that the capability is not the preset's to grant: the
-  // deployment's own default already carries `bash` and the filesystem tools, so
-  // any caller that may start a session at all can already run commands as this
-  // process. Pinning the switch would be a fence beside an open gate.
+const NATIVE_METHODS = new Set([
   'agentPreset.read',
   'agentPreset.copy',
   'agentPreset.openDocument',
   'agentPreset.remove',
   'host.pickDirectory',
   'host.openPath',
-  'settings.describe',
   'settings.openDocument',
+])
+
+/**
+ * The configuration plane: the settings and credential domains mutate the
+ * user's configuration and secret store, and READING them is equally
+ * privileged — `settings.describe` returns every exposed namespace's
+ * configuration and `credentials.describe` reports whether an arbitrary
+ * environment-variable name is configured and where from, which is
+ * reconnaissance no anonymous caller should have. `llm.discoverModels`
+ * belongs to that plane on both counts: it carries a draft credential, and it
+ * makes the HOST issue a GET to a URL the caller chose and reports back the
+ * status or the parsed body — an anonymous LAN caller would have a probe for
+ * whatever the host can reach and the browser cannot.
+ *
+ * A loopback request (the desktop) passes as before; a remote request passes
+ * only when the session the auth guard attached carries the settings-page
+ * permission, so the plane is gated by role rather than reachability once a
+ * real authentication layer exists. The model catalog (`llm.providers`,
+ * `llm.models`) stays deliberately outside both sets: it carries provider
+ * ids, display names, and model lists — no endpoints, keys, or key state —
+ * and a LAN client's model picker legitimately needs it.
+ */
+const CONFIGURATION_METHODS = new Set([
+  'settings.describe',
   'settings.update',
   'settings.replace',
   'settings.mutate',
@@ -118,12 +125,36 @@ const PRIVILEGED_METHODS = new Set([
   'llm.discoverModels',
 ])
 
+/** The permission a session needs to read or write the configuration plane. */
+const SETTINGS_PERMISSION = 'page:settings'
+
+/** The RPC method a /api request path names, or undefined for other paths. */
+function methodFromPath(pathname: string): string | undefined {
+  return pathname.startsWith(`${API_PATH}/`) ? pathname.slice(API_PATH.length + 1) : undefined
+}
+
+/**
+ * Whether one request may reach a configuration-plane method. A session the
+ * auth guard attached is the authoritative signal: the settings permission is
+ * enforced by role even when a reverse proxy rewrites Host to loopback, which
+ * would otherwise short-circuit the check. Without a session (the desktop has
+ * no auth layer) loopback reachability remains sufficient.
+ * @param req - the gated request.
+ * @returns whether the configuration plane may serve it.
+ */
+function configurationAuthorized(req: IncomingMessage): boolean {
+  const user = authUserOf(req)
+  if (user !== undefined) return user.permissions.includes(SETTINGS_PERMISSION)
+  return isTrustedApiRequest(req, [])
+}
+
 /**
  * Mounts the API gateway under the browser transport prefix. Every request on
  * the prefix passes the browser-trust fence first (DNS-rebinding and
- * cross-site defense — [api-request-trust](./api-request-trust.ts));
- * privileged methods additionally pass it with an empty trust list, which
- * pins them to loopback.
+ * cross-site defense — [api-request-trust](./api-request-trust.ts)); native
+ * methods additionally pass it with an empty trust list (loopback only), and
+ * configuration-plane methods pass only for loopback or a session carrying the
+ * settings-page permission.
  * @param ctx - Host plugin context.
  * @param config - resolved plugin config (schema defaults applied).
  */
@@ -139,14 +170,6 @@ export function apply(ctx: Context, config?: ConnectionConfig): void {
   const fetchHandler = connection.createSharedFetchHandler(API_PATH, {
     async fetch(request) {
       const pathname = new URL(request.url).pathname
-      const method = pathname.startsWith(`${API_PATH}/`)
-        ? pathname.slice(API_PATH.length + 1)
-        : undefined
-      if (method !== undefined
-        && PRIVILEGED_METHODS.has(method)
-        && !isTrustedApiRequest(request, [])) {
-        return new Response('forbidden', { status: 403 })
-      }
       if (request.method === 'GET' && (pathname === MUX_EVENTS_PATH || pathname === HOST_EVENTS_PATH)) {
         return new Response('upgrade required', {
           status: 426,
@@ -166,6 +189,20 @@ export function apply(ctx: Context, config?: ConnectionConfig): void {
         res.writeHead(403)
         res.end('forbidden')
         return
+      }
+      const pathname = new URL(req.url ?? '/', 'http://dsh.internal').pathname
+      const method = methodFromPath(pathname)
+      if (method !== undefined) {
+        if (NATIVE_METHODS.has(method) && !isTrustedApiRequest(req, [])) {
+          res.writeHead(403)
+          res.end('forbidden')
+          return
+        }
+        if (CONFIGURATION_METHODS.has(method) && !configurationAuthorized(req)) {
+          res.writeHead(403)
+          res.end('forbidden')
+          return
+        }
       }
       await bridge(req, res, fetchHandler, maxRequestBodyBytes)
     },
