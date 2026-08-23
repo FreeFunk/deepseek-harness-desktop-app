@@ -64,6 +64,7 @@ describe('web app browser startup', () => {
       '    printUrl: false',
       '    surfaceContext: false',
       '    trustedHosts: []',
+      '    authDbPath: ' + join(root, 'auth.db').replace(/\\/g, '/'),
       '',
     ].join('\n'))
 
@@ -80,7 +81,9 @@ describe('web app browser startup', () => {
     const opened = new Promise<void>((resolve) => { resolveOpened = resolve })
     internals.openBrowser = async (url) => {
       openedUrl = url
-      openedStatus = (await fetch(url)).status
+      // A fresh browser follows the auth guard's /login redirect; the login
+      // page answering 200 is the reachability signal the handoff waits for.
+      openedStatus = (await fetch(url, { headers: { accept: 'text/html' }, redirect: 'follow' })).status
       resolveOpened()
     }
 

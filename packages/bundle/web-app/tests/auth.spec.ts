@@ -287,12 +287,15 @@ describe('auth transport guard (login bypass fix)', () => {
   it('serves static dist through the fallback only for authenticated users', async () => {
     const h = await startHarness()
     // Without a session the dist is not reachable (already covered), and an
-    // authenticated session renders the index through the fallback with the
-    // bootstrap tap applied.
+    // authenticated session renders the index through the fallback.
     await h.login('admin', 'admin123')
-    const res = await h.request('/no/such/route', { headers: { accept: 'text/html' } })
-    expect(res.status).toBe(200)
-    expect(res.body).toContain('shell')
+    const root = await h.request('/', { headers: { accept: 'text/html' } })
+    expect(root.status).toBe(200)
+    expect(root.body).toContain('shell')
+    // A missing path reaches the static server (the guard admitted the
+    // session) and 404s an absent file instead of rejecting with 401.
+    const missing = await h.request('/no/such/route', { headers: { accept: 'text/html' } })
+    expect(missing.status).toBe(404)
   })
 })
 
