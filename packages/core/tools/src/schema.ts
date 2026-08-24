@@ -491,8 +491,8 @@ export interface DefineToolOptions<S extends ParameterSchemaSpec, O extends Valu
   readonly output: {
     /** Schema enforced against every successful body or policy-replaced value. */
     readonly schema: O
-    /** Pure Native/model rendering of one validated canonical value. */
-    render(args: InferArgs<S>, value: InferValue<NoInfer<O>>): ContentBlock[]
+    /** Pure Native/model rendering of one validated canonical value; defaults to JSON text when omitted. */
+    render?(args: InferArgs<S>, value: InferValue<NoInfer<O>>): ContentBlock[]
     /** Pure replayable presentation metadata for direct top-level calls. */
     presentationMeta?(args: InferArgs<S>, value: InferValue<NoInfer<O>>): JsonValue
   }
@@ -551,7 +551,10 @@ export function defineTool<const S extends ParameterSchemaSpec, const O extends 
   // oxlint-disable-next-line typescript/unbound-method
   const userFinalizeContent = options.finalizeContent
   // oxlint-disable-next-line typescript/unbound-method
-  const userRender = options.output.render
+  const userRender = options.output.render ?? ((_args: InferArgs<S>, value: InferValue<NoInfer<O>>) => [{
+    type: 'text',
+    text: JSON.stringify(value, null, 2),
+  }])
   // oxlint-disable-next-line typescript/unbound-method
   const userPresentationMeta = options.output.presentationMeta
   // oxlint-disable-next-line typescript/unbound-method

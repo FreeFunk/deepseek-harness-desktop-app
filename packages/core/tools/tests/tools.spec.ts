@@ -234,6 +234,40 @@ describe('ToolRuntime', () => {
       .toThrow('must declare output { schema, render, presentationMeta? }')
   })
 
+  it('defineTool renders JSON text when output.render is omitted', async () => {
+    const ctx = await setup()
+    ctx.tools.register(defineTool({
+      name: 'default-render',
+      description: 'requires JSON text rendering',
+      parameters: { text: { type: 'string', required: true } },
+      output: {
+        schema: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            ok: { type: 'boolean', required: true },
+            text: { type: 'string' },
+          },
+        },
+      },
+      async execute(args) {
+        return { ok: true, text: args.text }
+      },
+    }))
+
+    const result = await ctx.tools.execute({
+      signal: testToolSignal,
+      callId: CallId('default-render'),
+      name: 'default-render',
+      arguments: { text: 'hello' },
+    })
+    expect(result.isError).toBe(false)
+    expect(result.content).toEqual([{
+      type: 'text',
+      text: JSON.stringify({ ok: true, text: 'hello' }, null, 2),
+    }])
+  })
+
   it('rejects lossy and schema-mismatched body values before post-execute', async () => {
     const ctx = await setup()
     ctx.tools.register(defineTool({
