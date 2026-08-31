@@ -40,7 +40,7 @@ export interface AuthUser {
  * For cross-package access, use the string key `'@deepseek-ai/dsh-web-app/auth-user'`
  * — Symbol keys are not visible to code outside the package that defines them.
  */
-export const AUTH_USER = Symbol.for('@deepseek-ai/dsh-web-app/auth-user') as unique symbol
+export const AUTH_USER = Symbol.for('@deepseek-ai/dsh-web-app/auth-user')
 
 /** String key for cross-package access to the AUTH_USER marker. */
 export const AUTH_USER_KEY = '@deepseek-ai/dsh-web-app/auth-user' as const

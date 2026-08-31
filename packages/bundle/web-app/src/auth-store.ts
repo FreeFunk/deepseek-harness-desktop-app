@@ -366,7 +366,7 @@ export class AuthStore {
     if (input.permissions?.length) {
       this.assignPermissions(info.lastInsertRowid as number, input.permissions)
     }
-    return this.stmts.rolesList.get(info.lastInsertRowid) as DbRole
+    return this.stmts.rolesList.get(info.lastInsertRowid) as unknown as DbRole
   }
 
   updateRole(
@@ -394,7 +394,7 @@ export class AuthStore {
   }
 
   listPermissions(): DbPermission[] {
-    return this.stmts.permissionsList.all() as DbPermission[]
+    return this.stmts.permissionsList.all() as unknown as DbPermission[]
   }
 
   // ── Internals ─────────────────────────────────────────────────────────────
