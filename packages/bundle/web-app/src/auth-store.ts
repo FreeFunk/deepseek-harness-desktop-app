@@ -353,7 +353,7 @@ export class AuthStore {
   // ── Role management ───────────────────────────────────────────────────────
 
   listRoles(): DbRole[] {
-    return this.stmts.rolesList.all() as DbRole[]
+    return this.stmts.rolesList.all() as unknown as DbRole[]
   }
 
   createRole(input: {

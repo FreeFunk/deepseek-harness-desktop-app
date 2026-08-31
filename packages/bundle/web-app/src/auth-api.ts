@@ -262,7 +262,6 @@ async function handleAdminRoles(
     const body = await readBody(req)
     const name = typeof body?.name === 'string' ? body.name.trim() : ''
     const label = typeof body?.label === 'string' ? body.label.trim() : ''
-    const description = typeof body?.description === 'string' ? body.description : undefined
     const permissions = Array.isArray(body?.permissions) ? body.permissions as string[] : []
     if (!name || !label) { json(res, 400, { error: 'name and label required' }); return }
     try {
@@ -379,7 +378,7 @@ export function apply(
   // Shared user-resolution middleware: run before every auth route.
   function resolveUser(req: IncomingMessage): AuthUser | null {
     const token = readSessionCookie(req) as SessionToken | undefined
-    return store.getUserByToken(token) ?? null
+    return store.getUserByToken(token ?? null)
   }
 
   // The marker on the request is keyed by a stable string rather than a
