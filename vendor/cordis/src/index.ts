@@ -4,6 +4,7 @@ export * from './context.ts'
 export * from './events.ts'
 /** Plugin fiber lifecycle, effects, and config validation helpers. */
 export * from './fiber.ts'
+export { FiberState } from './fiber.ts'
 /** Logger facade, logger service, message, exporter, and formatting types. */
 export * from './logger.ts'
 /** Plugin registry, dependency injection, and plugin entrypoint types. */

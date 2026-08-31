@@ -60,6 +60,32 @@ CREATE TABLE IF NOT EXISTS sessions (
 
 CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at);
 CREATE INDEX IF NOT EXISTS idx_users_role ON users(role_id);
+
+-- Seed default roles if none exist
+INSERT OR IGNORE INTO roles (name, label, description) VALUES ('admin', 'Administrator', 'Full system access');
+INSERT OR IGNORE INTO roles (name, label, description) VALUES ('user', 'User', 'Standard user access');
+INSERT OR IGNORE INTO roles (name, label, description) VALUES ('viewer', 'Viewer', 'Read-only access');
+
+-- Seed permissions
+INSERT OR IGNORE INTO permissions (name) VALUES ('sessions:read');
+INSERT OR IGNORE INTO permissions (name) VALUES ('sessions:write');
+INSERT OR IGNORE INTO permissions (name) VALUES ('sessions:delete');
+INSERT OR IGNORE INTO permissions (name) VALUES ('users:read');
+INSERT OR IGNORE INTO permissions (name) VALUES ('users:write');
+INSERT OR IGNORE INTO permissions (name) VALUES ('users:delete');
+INSERT OR IGNORE INTO permissions (name) VALUES ('roles:manage');
+
+-- Assign permissions to roles
+INSERT OR IGNORE INTO role_permissions (role_id, permission_id)
+  SELECT r.id, p.id FROM roles r CROSS JOIN permissions p WHERE r.name = 'admin';
+
+INSERT OR IGNORE INTO role_permissions (role_id, permission_id)
+  SELECT r.id, p.id FROM roles r CROSS JOIN permissions p
+  WHERE r.name = 'user' AND p.name IN ('sessions:read', 'users:read');
+
+INSERT OR IGNORE INTO role_permissions (role_id, permission_id)
+  SELECT r.id, p.id FROM roles r CROSS JOIN permissions p
+  WHERE r.name = 'viewer' AND p.name = 'sessions:read';
 `
 
 // ── Password hashing ──────────────────────────────────────────────────────────
@@ -386,7 +412,7 @@ export class AuthStore {
       this.stmts.rolePermissionsDelete.run(id)
       if (updates.permissions.length) this.assignPermissions(id, updates.permissions)
     }
-    return this.stmts.rolesList.get(id) as DbRole
+    return this.stmts.rolesList.get(id) as unknown as DbRole
   }
 
   deleteRole(id: number): void {

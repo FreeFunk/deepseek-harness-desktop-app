@@ -35,6 +35,11 @@ type SettingsNamespaceInput<Value extends string> = Value extends SettingsNamesp
       ? ValidNamespaceTail<Rest> extends true ? Value : never
       : never
 
+/** Parse and validate a settings namespace string. */
+export function settingsNamespace(value: string): SettingsNamespace {
+  return parseSettingsNamespace(value)
+}
+
 function parseSettingsNamespace(value: string): SettingsNamespace {
   if (!NAMESPACE_PATTERN.test(value)) {
     throw new TypeError(`settings namespace "${value}" must match ${String(NAMESPACE_PATTERN)}`)
