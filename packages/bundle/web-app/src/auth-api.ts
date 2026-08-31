@@ -653,7 +653,7 @@ function adminConsoleHtml(): string {
 
 /** Plugin config schema (passed through to AuthPluginOptions). */
 export const Config: z<AuthPluginOptions> = z.object({
-  dbPath: z.string().optional(),
-  sessionExpireHours: z.natural().min(1).optional(),
-  adminConsole: z.boolean().optional(),
+  dbPath: z.string(),
+  sessionExpireHours: z.natural().min(1),
+  adminConsole: z.boolean(),
 })
