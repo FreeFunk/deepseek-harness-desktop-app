@@ -89,8 +89,6 @@ export { authBootstrapScript } from './auth-bootstrap.ts'
 
 // ── Route handlers ────────────────────────────────────────────────────────────
 
-type RouteHandler = (req: IncomingMessage, res: ServerResponse, user: AuthUser | null) => void | Promise<void>
-
 async function readBody(req: IncomingMessage): Promise<Record<string, unknown> | null> {
   return await new Promise<Record<string, unknown> | null>((resolve) => {
     let data = ''
@@ -131,7 +129,7 @@ async function handleLogout(
 ): Promise<void> {
   if (req.method !== 'POST') { json(res, 405, { error: 'method not allowed' }); return }
   const token = readSessionCookie(req) as SessionToken | undefined
-  store.destroySession(token)
+  store.destroySession(token ?? null)
   clearSessionCookie(res)
   json(res, 200, { ok: true })
 }
@@ -229,12 +227,12 @@ async function handleAdminUserById(
     if (!requirePermission(user, 'api:admin')) { json(res, 403, { error: 'api:admin permission required' }); return }
     const body = await readBody(req)
     try {
-      const updated = store.updateUser(id, {
-        displayName: body?.displayName as string | undefined,
-        roleId: typeof body?.roleId === 'number' ? body.roleId : undefined,
-        status: typeof body?.status === 'number' ? body.status : undefined,
-        password: typeof body?.password === 'string' ? body.password : undefined,
-      })
+      const updates: { displayName?: string; roleId?: number; status?: number; password?: string } = {}
+      if (typeof body?.displayName === 'string') updates.displayName = body.displayName
+      if (typeof body?.roleId === 'number') updates.roleId = body.roleId
+      if (typeof body?.status === 'number') updates.status = body.status
+      if (typeof body?.password === 'string') updates.password = body.password
+      const updated = store.updateUser(id, updates)
       json(res, 200, { id: updated.id, username: updated.username, roleId: updated.roleId })
     } catch (err) {
       const msg = err instanceof Error ? err.message : '更新失败'
@@ -268,7 +266,9 @@ async function handleAdminRoles(
     const permissions = Array.isArray(body?.permissions) ? body.permissions as string[] : []
     if (!name || !label) { json(res, 400, { error: 'name and label required' }); return }
     try {
-      const created = store.createRole({ name, label, description, permissions })
+      const roleInput: { name: string; label: string; description?: string; permissions: string[] } = { name, label, permissions }
+      if (typeof body?.description === 'string') roleInput.description = body.description
+      const created = store.createRole(roleInput)
       json(res, 201, created)
     } catch (err) {
       json(res, 400, { error: err instanceof Error ? err.message : '创建角色失败' })
@@ -292,11 +292,11 @@ async function handleAdminRoleById(
     if (!requirePermission(user, 'api:admin')) { json(res, 403, { error: 'api:admin permission required' }); return }
     const body = await readBody(req)
     try {
-      const updated = store.updateRole(id, {
-        label: typeof body?.label === 'string' ? body.label : undefined,
-        description: typeof body?.description === 'string' ? body.description : undefined,
-        permissions: Array.isArray(body?.permissions) ? body.permissions : undefined,
-      })
+      const updateInput: { label?: string; description?: string; permissions?: string[] } = {}
+      if (typeof body?.label === 'string') updateInput.label = body.label
+      if (typeof body?.description === 'string') updateInput.description = body.description
+      if (Array.isArray(body?.permissions)) updateInput.permissions = body.permissions as string[]
+      const updated = store.updateRole(id, updateInput)
       json(res, 200, updated)
     } catch (err) {
       json(res, 400, { error: err instanceof Error ? err.message : '更新失败' })
@@ -365,8 +365,8 @@ export function apply(
   if (!webServer) throw new Error('dsh-web-app-auth: webServer service not available')
 
   const store = new AuthStore({
-    dbPath: options.dbPath,
-    sessionExpireHours: options.sessionExpireHours,
+    ...(options.dbPath ? { dbPath: options.dbPath } : {}),
+    ...(options.sessionExpireHours ? { sessionExpireHours: options.sessionExpireHours } : {}),
   })
 
   // Detect HTTPS from X-Forwarded-Proto (for reverse proxies) or the socket.
@@ -653,7 +653,7 @@ function adminConsoleHtml(): string {
 
 /** Plugin config schema (passed through to AuthPluginOptions). */
 export const Config: z<AuthPluginOptions> = z.object({
-  dbPath: z.string().optional(),
-  sessionExpireHours: z.natural().min(1).optional(),
-  adminConsole: z.boolean().optional(),
+  dbPath: z.string(),
+  sessionExpireHours: z.natural().min(1),
+  adminConsole: z.boolean(),
 })

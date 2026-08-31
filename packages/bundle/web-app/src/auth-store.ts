@@ -304,7 +304,7 @@ export class AuthStore {
       input.roleId,
       input.status ?? 1,
     )
-    const user = this.stmts.userById.get(info.lastInsertRowid) as DbUser
+    const user = this.stmts.userById.get(info.lastInsertRowid) as unknown as DbUser
     const resolved = this.toAuthUser(user)
     if (resolved === null) throw new Error('created user but has no active session')
     return resolved
@@ -331,7 +331,7 @@ export class AuthStore {
       const salt = randomBytes(16)
       this.stmts.userUpdatePassword.run(encodeHash(salt, hashPassword(updates.password, salt)), id)
     }
-    const user = this.stmts.userById.get(id) as DbUser
+    const user = this.stmts.userById.get(id) as unknown as DbUser
     const resolved = this.toAuthUser(user)
     if (resolved === null) throw new Error('updated user but has no active session')
     return resolved
@@ -373,7 +373,7 @@ export class AuthStore {
     id: number,
     updates: { label?: string; description?: string; permissions?: Permission[] },
   ): DbRole {
-    const existing = this.stmts.rolesList.get(id) as DbRole | undefined
+    const existing = this.stmts.rolesList.get(id) as unknown as DbRole | undefined
     if (!existing) throw new Error('role not found')
     if (updates.label !== undefined || updates.description !== undefined) {
       this.stmts.roleUpdate.run(
