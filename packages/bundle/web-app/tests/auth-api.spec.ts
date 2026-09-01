@@ -14,7 +14,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import type { WebServer, WebRoute } from '@deepseek-ai/dsh-host-webserver'
+import type { WebGuard, WebServer, WebRoute } from '@deepseek-ai/dsh-host-webserver'
 import { apply as applyAuth } from '../src/auth.ts'
 import { authBootstrapScript } from '../src/auth-api.ts'
 import type { AuthUser } from '../src/auth-user.ts'
@@ -70,6 +70,7 @@ async function bootAuthServer(): Promise<RunningServer> {
   const dir = mkdtempSync(join(tmpdir(), 'dsh-auth-api-test-'))
   const dbPath = join(dir, 'auth.db')
   const routes: Array<{ kind: 'exact' | 'prefix'; path: string; handler: (req: IncomingMessage, res: ServerResponse) => void | Promise<void> }> = []
+  const guards: WebGuard[] = []
   const webserverShim: WebServer = {
     host: '127.0.0.1',
     port: 0,
@@ -81,7 +82,13 @@ async function bootAuthServer(): Promise<RunningServer> {
       }
     },
     registerFallback: () => () => {},
-    registerGuard: () => () => {},
+    registerGuard: (guard: WebGuard) => {
+      guards.push(guard)
+      return () => {
+        const idx = guards.indexOf(guard)
+        if (idx >= 0) guards.splice(idx, 1)
+      }
+    },
     tapIndex: () => () => {},
     renderIndex: (html: string) => html,
   } as unknown as WebServer
@@ -90,8 +97,16 @@ async function bootAuthServer(): Promise<RunningServer> {
   ctx.provide('webServer', webserverShim)
   applyAuth(ctx, { dbPath })
 
-  // Start a real http server that dispatches to the registered routes.
+  // Start a real http server that runs the transport guards in registration
+  // order (exactly like the production webserver) before dispatching to the
+  // registered routes, so the guard + dispatch double-resolution path is
+  // exercised.
   const httpServer = createServer(async (req, res) => {
+    for (const guard of guards) {
+      let delegated = false
+      await guard({ req, res }, () => { delegated = true })
+      if (!delegated) return
+    }
     const pathname = new URL(req.url ?? '/', 'http://x').pathname
     // Try exact match first.
     const exact = routes.find(r => r.kind === 'exact' && r.path === pathname)
@@ -441,9 +456,20 @@ describe('auth plugin HTTP integration', () => {
   })
 
   describe('fall-through', () => {
-    it('unmatched routes return 404', async () => {
-      const res = await request(server.baseUrl, 'GET', '/static/file.js')
+    it('unmatched routes return 404 for an authenticated request', async () => {
+      // The transport guard intercepts unauthenticated requests before routing,
+      // so a 404 is only reachable with a session.
+      const login = await request(server.baseUrl, 'POST', '/login', {
+        body: { username: 'admin', password: 'admin123' },
+      })
+      const cookie = cookieValue(login.headers, 'dsh_session')!
+      const res = await request(server.baseUrl, 'GET', '/static/file.js', { cookie: `dsh_session=${cookie}` })
       expect(res.status).toBe(404)
+    })
+
+    it('unmatched routes without a session are rejected by the guard', async () => {
+      const res = await request(server.baseUrl, 'GET', '/static/file.js')
+      expect(res.status).toBe(401)
     })
   })
 })

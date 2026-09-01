@@ -451,18 +451,25 @@ export function apply(
   // own string key and the webserver package's cross-package AUTH_USER symbol
   // (the connection configuration-plane fence reads the latter).
   function attachUser(req: IncomingMessage, user: AuthUser | null): void {
-    Object.defineProperty(req, AUTH_USER_KEY, {
-      value: user,
-      writable: false,
-      enumerable: false,
-      configurable: false,
-    })
-    Object.defineProperty(req, AUTH_USER, {
-      value: user,
-      writable: false,
-      enumerable: false,
-      configurable: false,
-    })
+    // Idempotent: the transport guard already attached the resolved user before
+    // dispatch runs on the real server; redefining a non-configurable property
+    // with a freshly resolved (different object identity) user would throw.
+    if (!(AUTH_USER_KEY in req)) {
+      Object.defineProperty(req, AUTH_USER_KEY, {
+        value: user,
+        writable: false,
+        enumerable: false,
+        configurable: false,
+      })
+    }
+    if (!(AUTH_USER in req)) {
+      Object.defineProperty(req, AUTH_USER, {
+        value: user,
+        writable: false,
+        enumerable: false,
+        configurable: false,
+      })
+    }
   }
 
   // Transport gate: every request (HTTP and upgrade) passes here before any
