@@ -1,6 +1,7 @@
 /** Host registry and HTTP adapter for generic Connection RPC channels. */
 
 import { Context, Service } from '@deepseek-ai/cordis'
+import type { IncomingMessage } from 'node:http'
 import type { WebRoute } from '@deepseek-ai/dsh-host-webserver'
 import {
   RpcId,
@@ -11,6 +12,7 @@ import { clientRequestSchema } from './rpc-schema.ts'
 import { bridge, type FetchHandler } from './http-bridge.ts'
 import { isTrustedApiRequest } from './api-request-trust.ts'
 import { API_PATH } from './api-path.ts'
+import { authUserOf } from '@deepseek-ai/dsh-host-webserver'
 import type { BrowserAuth } from './browser-auth.ts'
 import type {
   ConnectionIndexRequest,
@@ -95,6 +97,9 @@ export class HostConnectionService extends Service implements HostConnectionHand
   /** Apply the configured Host/Origin fence, then browser authentication. */
   requestRejection(request: ConnectionTrustRequest): ConnectionRequestRejection {
     if (!isTrustedApiRequest(request, this.trustedHosts)) return 403
+    // A session the auth transport guard attached is authoritative: the guard
+    // already verified login, so the browser-token exchange must not reject it.
+    if (authUserOf(request as ConnectionTrustRequest & IncomingMessage) !== undefined) return undefined
     return this.browserAuth.isAuthenticated(request) ? undefined : 401
   }
 

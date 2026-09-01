@@ -1,26 +1,39 @@
 /**
- * Auth plugin: registers `/login`, `/logout`, and `/auth/admin/*` HTTP routes
- * on the host webserver, plus a slot contribution for the SPA startup script.
+ * Auth plugin: role-based access control for the Web surface. Owns the auth
+ * database (users/roles/permissions/sessions), the transport-level guard that
+ * gates every request the webserver dispatches (HTTP routes, the /api/* RPC
+ * prefix, and WebSocket upgrades), the login page, the admin console
+ * (/admin), and the SPA bootstrap tap.
  *
- * Session management uses the `AUTH_SESSION_COOKIE` HttpOnly cookie; the
- * browser-side `authBootstrap` script reads the `AUTH_USER` event to populate
- * the client-side identity.
+ * The guard is the single enforcement point: before any route, fallback, or
+ * upgrade handler runs it admits only the public auth surface (/login,
+ * /api/auth/login, /api/auth/logout, and the /auth/* legacy aliases)
+ * without a session and rejects everything else with a redirect (HTML
+ * navigation), 401 JSON (API), or a destroyed socket (upgrade). Named routes
+ * therefore cannot bypass login by being more specific than the fallback.
  *
- * All `/auth/admin/*` routes require the `page:admin` permission on the
- * resolved `AuthUser`; the `api:admin` permission gates destructive mutations.
+ * Role model: a user has one role; a role has a set of permissions. Page
+ * permissions (page:*) drive the UI and the admin-console gate; the
+ * `api:admin` permission gates the user/role/permission management API.
+ * @module @deepseek-ai/dsh-web-app/auth
  */
-
 import type { IncomingMessage, ServerResponse } from 'node:http'
+import { readFileSync } from 'node:fs'
+import { homedir } from 'node:os'
+import { join, dirname } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
+import { AUTH_USER, type WebGuard } from '@deepseek-ai/dsh-host-webserver'
 import type { WebRoute } from '@deepseek-ai/dsh-host-webserver'
 import type { WebServer } from '@deepseek-ai/dsh-host-webserver'
 import type { SessionToken } from './auth-user.ts'
 import type { AuthUser } from './auth-user.ts'
 import { AUTH_USER_KEY } from './auth-user.ts'
 import { AuthStore } from './auth-store.ts'
+import { ADMIN_CONSOLE_HTML } from './admin-console.ts'
+import { AUTH_BOOTSTRAP_SCRIPT } from './bootstrap.ts'
 
-export { AUTH_USER, type AuthUser } from './auth-user.ts'
+export type { AuthUser } from './auth-user.ts'
 
 /** Name of the HttpOnly session cookie. */
 export const AUTH_SESSION_COOKIE = 'dsh_session'
@@ -118,7 +131,16 @@ async function handleLogin(
   if (!authed) { json(res, 401, { error: '用户名或密码错误' }); return }
   const { token, expiresAt } = store.createSession(authed.id)
   setSessionCookie(res, token, expiresAt, secure)
-  json(res, 200, { id: authed.id, username: authed.username, roleName: authed.roleName })
+  json(res, 200, {
+    id: authed.id,
+    username: authed.username,
+    displayName: authed.displayName,
+    roleId: authed.roleId,
+    roleName: authed.roleName,
+    role: { id: authed.roleId, name: authed.roleName, label: authed.roleLabel },
+    permissions: [...authed.permissions],
+    status: authed.status,
+  })
 }
 
 async function handleLogout(
@@ -147,7 +169,9 @@ async function handleMe(
     displayName: user.displayName,
     roleId: user.roleId,
     roleName: user.roleName,
+    role: { id: user.roleId, name: user.roleName, label: user.roleLabel },
     permissions: [...user.permissions],
+    status: user.status,
   })
 }
 
@@ -183,15 +207,7 @@ async function handleAdminUsers(
 ): Promise<void> {
   if (!requirePermission(user, 'page:admin')) { json(res, 403, { error: 'permission denied' }); return }
   if (req.method === 'GET') {
-    const list = store.listUsers()
-    json(res, 200, list.map(u => ({
-      id: u.id,
-      username: u.username,
-      displayName: u.displayName,
-      roleId: u.roleId,
-      roleName: u.roleName,
-      status: u.status,
-    })))
+    json(res, 200, { users: store.listUsers() })
     return
   }
   if (req.method === 'POST') {
@@ -202,8 +218,14 @@ async function handleAdminUsers(
     const roleId = typeof body?.roleId === 'number' ? body.roleId : 0
     if (!username || !password || !roleId) { json(res, 400, { error: 'username, password, roleId required' }); return }
     try {
-      const created = store.createUser({ username, password, roleId })
-      json(res, 201, { id: created.id, username: created.username, roleId: created.roleId })
+      const created = store.createUser({
+        username,
+        password,
+        roleId,
+        ...(typeof body?.displayName === 'string' ? { displayName: body.displayName } : {}),
+        ...(typeof body?.status === 'number' ? { status: body.status } : {}),
+      })
+      json(res, 201, { user: created })
     } catch (err) {
       const msg = err instanceof Error ? err.message : '创建用户失败'
       json(res, 400, { error: msg })
@@ -223,7 +245,7 @@ async function handleAdminUserById(
   if (!requirePermission(user, 'page:admin')) { json(res, 403, { error: 'permission denied' }); return }
   const id = Number.parseInt(idParam, 10)
   if (!Number.isFinite(id)) { json(res, 400, { error: 'invalid id' }); return }
-  if (req.method === 'PUT') {
+  if (req.method === 'PUT' || req.method === 'PATCH') {
     if (!requirePermission(user, 'api:admin')) { json(res, 403, { error: 'api:admin permission required' }); return }
     const body = await readBody(req)
     try {
@@ -233,7 +255,7 @@ async function handleAdminUserById(
       if (typeof body?.status === 'number') updates.status = body.status
       if (typeof body?.password === 'string') updates.password = body.password
       const updated = store.updateUser(id, updates)
-      json(res, 200, { id: updated.id, username: updated.username, roleId: updated.roleId })
+      json(res, 200, { user: updated })
     } catch (err) {
       const msg = err instanceof Error ? err.message : '更新失败'
       json(res, 400, { error: msg })
@@ -256,7 +278,7 @@ async function handleAdminRoles(
   store: AuthStore,
 ): Promise<void> {
   if (!requirePermission(user, 'page:admin')) { json(res, 403, { error: 'permission denied' }); return }
-  if (req.method === 'GET') { json(res, 200, store.listRoles()); return }
+  if (req.method === 'GET') { json(res, 200, { roles: store.listRoles() }); return }
   if (req.method === 'POST') {
     if (!requirePermission(user, 'api:admin')) { json(res, 403, { error: 'api:admin permission required' }); return }
     const body = await readBody(req)
@@ -268,7 +290,7 @@ async function handleAdminRoles(
       const roleInput: { name: string; label: string; description?: string; permissions: string[] } = { name, label, permissions }
       if (typeof body?.description === 'string') roleInput.description = body.description
       const created = store.createRole(roleInput)
-      json(res, 201, created)
+      json(res, 201, { role: created })
     } catch (err) {
       json(res, 400, { error: err instanceof Error ? err.message : '创建角色失败' })
     }
@@ -287,7 +309,7 @@ async function handleAdminRoleById(
   if (!requirePermission(user, 'page:admin')) { json(res, 403, { error: 'permission denied' }); return }
   const id = Number.parseInt(idParam, 10)
   if (!Number.isFinite(id)) { json(res, 400, { error: 'invalid id' }); return }
-  if (req.method === 'PUT') {
+  if (req.method === 'PUT' || req.method === 'PATCH') {
     if (!requirePermission(user, 'api:admin')) { json(res, 403, { error: 'api:admin permission required' }); return }
     const body = await readBody(req)
     try {
@@ -296,7 +318,7 @@ async function handleAdminRoleById(
       if (typeof body?.description === 'string') updateInput.description = body.description
       if (Array.isArray(body?.permissions)) updateInput.permissions = body.permissions as string[]
       const updated = store.updateRole(id, updateInput)
-      json(res, 200, updated)
+      json(res, 200, { role: updated })
     } catch (err) {
       json(res, 400, { error: err instanceof Error ? err.message : '更新失败' })
     }
@@ -318,8 +340,50 @@ async function handleAdminPermissions(
   store: AuthStore,
 ): Promise<void> {
   if (!requirePermission(user, 'page:admin')) { json(res, 403, { error: 'permission denied' }); return }
-  if (req.method === 'GET') { json(res, 200, store.listPermissions()); return }
+  if (req.method === 'GET') {
+    json(res, 200, { permissions: store.listPermissions().map(permissionView) })
+    return
+  }
   json(res, 405, { error: 'method not allowed' })
+}
+
+// ── Permission catalog ───────────────────────────────────────────────────────
+
+/** Display metadata for the seeded permission catalog; unknown keys fall back to the key itself. */
+const PERMISSION_CATALOG: Readonly<Record<string, { label: string; group: string; description: string }>> = {
+  'page:chat': { label: '对话', group: 'page', description: '进入对话界面' },
+  'page:history': { label: '会话历史', group: 'page', description: '查看会话历史列表' },
+  'page:settings': { label: '设置', group: 'page', description: '访问设置（含模型配置）' },
+  'page:tools': { label: '工具', group: 'page', description: '查看工具视图' },
+  'page:admin': { label: '管理控制台', group: 'page', description: '进入用户/角色/权限管理控制台' },
+  'api:admin': { label: '管理接口', group: 'api', description: '调用用户/角色/权限管理接口' },
+  'session:list': { label: '会话列表', group: 'page', description: '查看会话列表' },
+  'session:read': { label: '会话读取', group: 'page', description: '读取会话记录' },
+  'session:delete': { label: '会话删除', group: 'page', description: '删除会话记录' },
+  'settings:read': { label: '设置读取', group: 'page', description: '读取设置项' },
+  'settings:write': { label: '设置写入', group: 'page', description: '修改设置项' },
+}
+
+/** Admin permissions-list row: stable key plus display metadata. */
+interface PermissionView {
+  id: number
+  key: string
+  label: string
+  group: string
+  description: string
+}
+
+function permissionView(permission: { id: number; name: string }): PermissionView {
+  const meta = PERMISSION_CATALOG[permission.name]
+  const group = meta?.group ?? (permission.name.startsWith('api:') ? 'api' : 'page')
+  const label = meta?.label ?? permission.name
+  return {
+    id: permission.id,
+    key: permission.name,
+    label,
+    group,
+    description: meta?.description ?? label,
+  }
 }
 
 // ── Plugin apply ─────────────────────────────────────────────────────────────
@@ -339,7 +403,8 @@ export interface AuthPluginOptions {
  * on teardown.
  *
  * Registered routes:
- *   POST   /login
+ *   GET    /login          (login page HTML)
+ *   POST   /login          (JSON login)
  *   POST   /logout
  *   GET    /auth/me
  *   POST   /auth/change-password
@@ -363,6 +428,7 @@ export function apply(
   const webServer = ctx.get('webServer') as WebServer | undefined
   if (!webServer) throw new Error('dsh-web-app-auth: webServer service not available')
 
+  const dbPath = options.dbPath ?? join(homedir(), '.dsh', 'auth.db')
   const store = new AuthStore({
     ...(options.dbPath ? { dbPath: options.dbPath } : {}),
     ...(options.sessionExpireHours ? { sessionExpireHours: options.sessionExpireHours } : {}),
@@ -381,48 +447,131 @@ export function apply(
     return store.getUserByToken(token ?? null)
   }
 
-  // The marker on the request is keyed by a stable string rather than a
-  // symbol identity, because Symbol keys are not visible to code outside the
-  // package that defines them.
-  function dispatch(req: IncomingMessage, res: ServerResponse): true | undefined {
-    const pathname = new URL(req.url ?? '/', 'http://x').pathname
-
-    // Attach the resolved user for downstream readers.
-    const user = resolveUser(req)
+  // Attach the resolved user for downstream readers: both the auth package's
+  // own string key and the webserver package's cross-package AUTH_USER symbol
+  // (the connection configuration-plane fence reads the latter).
+  function attachUser(req: IncomingMessage, user: AuthUser | null): void {
     Object.defineProperty(req, AUTH_USER_KEY, {
       value: user,
       writable: false,
       enumerable: false,
       configurable: false,
     })
+    Object.defineProperty(req, AUTH_USER, {
+      value: user,
+      writable: false,
+      enumerable: false,
+      configurable: false,
+    })
+  }
 
-    // ── /login ──────────────────────────────────────────────────────────────
-    if (pathname === '/login') {
+  // Transport gate: every request (HTTP and upgrade) passes here before any
+  // route, fallback, or upgrade handler. Only the public auth surface may
+  // proceed without a session.
+  const guard: WebGuard = (target, next) => {
+    const pathname = new URL(target.req.url ?? '/', 'http://x').pathname
+    const method = target.req.method ?? 'GET'
+    const user = resolveUser(target.req)
+    attachUser(target.req, user)
+    if (user !== null) return next()
+    const publicPath =
+      pathname === '/login'
+      || pathname === '/api/auth/login'
+      || pathname === '/api/auth/logout'
+      || pathname === '/auth/login'
+      || pathname === '/auth/logout'
+      || pathname === '/logout'
+      || (pathname === '/auth/login-json' && method === 'POST')
+    if (publicPath) return next()
+    if (target.socket !== undefined) { target.socket.destroy(); return }
+    if (target.res !== undefined) {
+      if (pathname.startsWith('/api/') || pathname.startsWith('/auth/')) {
+        json(target.res, 401, { error: '未登录' })
+        return
+      }
+      const accept = target.req.headers.accept ?? ''
+      if (accept.includes('text/html')) {
+        target.res.writeHead(302, { Location: '/login' })
+        target.res.end()
+        return
+      }
+      json(target.res, 401, { error: '未登录' })
+      return
+    }
+    return next()
+  }
+  ctx.effect(() => webServer.registerGuard(guard), 'dsh-web-app-auth: transport guard')
+
+  // The marker on the request is keyed by a stable string rather than a
+  // symbol identity, because Symbol keys are not visible to code outside the
+  // package that defines them.
+  function dispatch(req: IncomingMessage, res: ServerResponse): true | undefined {
+    const pathname = new URL(req.url ?? '/', 'http://x').pathname
+    const user = resolveUser(req)
+    attachUser(req, user)
+
+    // ── /login (HTML page; POST also accepts JSON login) ─────────────────────
+    if (pathname === '/login' || pathname === '/auth/login') {
+      if (req.method === 'GET') {
+        if (user !== null) {
+          res.writeHead(302, { Location: '/' })
+          res.end()
+          return true
+        }
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
+        res.end(LOGIN_HTML)
+        return true
+      }
+      if (req.method === 'POST') {
+        void handleLogin(req, res, user, store, isSecure(req))
+        return true
+      }
+      json(res, 405, { error: 'method not allowed' })
+      return true
+    }
+
+    // ── /login-json (legacy alias for the SPA login form) ───────────────────
+    if (pathname === '/login-json' || pathname === '/auth/login-json') {
       void handleLogin(req, res, user, store, isSecure(req))
       return true
     }
 
-    // ── /logout ──────────────────────────────────────────────────────────────
-    if (pathname === '/logout') {
+    // ── /logout ─────────────────────────────────────────────────────────────
+    if (pathname === '/logout' || pathname === '/auth/logout' || pathname === '/api/auth/logout') {
       void handleLogout(req, res, user, store)
       return true
     }
 
-    // ── /auth/me ─────────────────────────────────────────────────────────────
-    if (pathname === '/auth/me') {
+    // ── /api/auth/login (JSON) ──────────────────────────────────────────────
+    if (pathname === '/api/auth/login') {
+      void handleLogin(req, res, user, store, isSecure(req))
+      return true
+    }
+
+    // ── /auth/me and /api/auth/me ───────────────────────────────────────────
+    if (pathname === '/auth/me' || pathname === '/api/auth/me') {
       void handleMe(req, res, user)
       return true
     }
 
-    // ── /auth/change-password ───────────────────────────────────────────────
-    if (pathname === '/auth/change-password') {
+    // ── /auth/change-password and /api/auth/password ────────────────────────
+    if (pathname === '/auth/change-password' || pathname === '/api/auth/password') {
       void handleChangePassword(req, res, user, store)
       return true
     }
 
-    // ── /auth/admin/* ────────────────────────────────────────────────────────
-    if (pathname.startsWith('/auth/admin/')) {
-      const sub = pathname.slice('/auth/admin/'.length)
+    // ── /auth/menus and /api/auth/menus ─────────────────────────────────────
+    if (pathname === '/auth/menus' || pathname === '/api/auth/menus') {
+      if (req.method !== 'GET') { json(res, 405, { error: 'method not allowed' }); return true }
+      if (user === null) { json(res, 401, { error: 'not authenticated' }); return true }
+      json(res, 200, { menus: menusFor(user) })
+      return true
+    }
+
+    // ── /auth/admin/* and /api/auth/* admin surface ─────────────────────────
+    const adminMatch = pathname.match(/^\/(?:auth\/admin|api\/auth)\/(.+)$/)
+    if (adminMatch) {
+      const sub = adminMatch[1] ?? ""
       if (sub === 'users') { void handleAdminUsers(req, res, user, store); return true }
       if (sub.startsWith('users/')) {
         void handleAdminUserById(req, res, user, store, sub.slice('users/'.length))
@@ -438,13 +587,20 @@ export function apply(
 
     // ── /admin ──────────────────────────────────────────────────────────────
     if (pathname === '/admin' && options.adminConsole !== false) {
+      if (user === null) { res.writeHead(302, { Location: '/login' }); res.end(); return true }
       if (!requirePermission(user, 'page:admin')) {
-        res.writeHead(302, { Location: '/login' })
-        res.end()
+        res.writeHead(403, { 'Content-Type': 'text/html; charset=utf-8' })
+        res.end(/* html */`<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>无权限</title></head>
+<body style="background:#0d1117;color:#c9d1d9;font-family:system-ui,-apple-system,sans-serif;display:flex;justify-content:center;align-items:center;min-height:100vh">
+<div style="text-align:center"><h1 style="color:#f85149">403 无权限</h1>
+<p style="color:#8b949e">当前账号没有访问管理控制台的权限</p>
+<p style="margin-top:12px"><a href="/" style="color:#58a6ff">返回首页</a></p></div></body></html>`)
         return true
       }
+      const settingsPath = join(dirname(dbPath), 'settings.yaml')
+      const html = ADMIN_CONSOLE_HTML.replace('<!--__AUTH_BOOT_THEME__-->', bootThemeScript(themePreference(settingsPath)))
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
-      res.end(adminConsoleHtml())
+      res.end(html)
       return true
     }
 
@@ -455,18 +611,30 @@ export function apply(
   // Register exact routes first (matcher checks exact before prefix).
   const exactRoutes: WebRoute[] = [
     { kind: 'exact', path: '/login', handler: (req, res) => { void dispatch(req, res) } },
+    { kind: 'exact', path: '/login-json', handler: (req, res) => { void dispatch(req, res) } },
     { kind: 'exact', path: '/logout', handler: (req, res) => { void dispatch(req, res) } },
     { kind: 'exact', path: '/admin', handler: (req, res) => { void dispatch(req, res) } },
+    { kind: 'exact', path: '/api/auth/login', handler: (req, res) => { void dispatch(req, res) } },
+    { kind: 'exact', path: '/api/auth/logout', handler: (req, res) => { void dispatch(req, res) } },
+    { kind: 'exact', path: '/api/auth/me', handler: (req, res) => { void dispatch(req, res) } },
+    { kind: 'exact', path: '/api/auth/password', handler: (req, res) => { void dispatch(req, res) } },
+    { kind: 'exact', path: '/api/auth/menus', handler: (req, res) => { void dispatch(req, res) } },
+    { kind: 'exact', path: '/api/auth/users', handler: (req, res) => { void dispatch(req, res) } },
+    { kind: 'exact', path: '/api/auth/roles', handler: (req, res) => { void dispatch(req, res) } },
+    { kind: 'exact', path: '/api/auth/permissions', handler: (req, res) => { void dispatch(req, res) } },
   ]
-  const prefixRoute: WebRoute = {
-    kind: 'prefix',
-    path: '/auth',
-    handler: (req, res) => { void dispatch(req, res) },
-  }
+  const prefixRoutes: WebRoute[] = [
+    { kind: 'prefix', path: '/auth', handler: (req, res) => { void dispatch(req, res) } },
+    { kind: 'prefix', path: '/api/auth', handler: (req, res) => { void dispatch(req, res) } },
+  ]
 
   const disposers: Array<() => void> = []
   for (const r of exactRoutes) disposers.push(webServer.register(r))
-  disposers.push(webServer.register(prefixRoute))
+  for (const r of prefixRoutes) disposers.push(webServer.register(r))
+
+  // Inject the SPA bootstrap so the sidebar shows the signed-in user and
+  // redirects an expired session to /login.
+  ctx.effect(() => webServer.tapIndex(injectBootstrap), 'dsh-web-app-auth: bootstrap index tap')
 
   // Cleanup: close the database and remove routes.
   ctx.effect(() => () => {
@@ -475,179 +643,111 @@ export function apply(
   }, 'dsh-web-app-auth: cleanup')
 }
 
-// ── Admin console HTML ───────────────────────────────────────────────────────
+// ── Login page and SPA bootstrap ─────────────────────────────────────────────
 
-function adminConsoleHtml(): string {
-  return /* html */`<!DOCTYPE html>
-<html lang="zh">
+const LOGIN_HTML = /* html */`<!DOCTYPE html>
+<html lang="zh-CN">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>DSH 管理控制台</title>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>登录 - DeepSeek Harness</title>
 <style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: system-ui, -apple-system, sans-serif; background: #f7f8fa; color: #1a1a2e; min-height: 100vh; }
-  .header { background: #1a1a2e; color: #fff; padding: 1rem 2rem; display: flex; align-items: center; gap: 1rem; }
-  .header h1 { font-size: 1.2rem; font-weight: 600; }
-  .header a { color: #7ec8e3; text-decoration: none; font-size: 0.875rem; }
-  .container { max-width: 900px; margin: 2rem auto; padding: 0 1rem; }
-  .tabs { display: flex; gap: 0.5rem; border-bottom: 2px solid #e5e7eb; margin-bottom: 1.5rem; }
-  .tab { padding: 0.75rem 1.25rem; cursor: pointer; border: none; background: none; font-size: 0.9rem; color: #6b7280; border-bottom: 2px solid transparent; margin-bottom: -2px; }
-  .tab.active { color: #1a1a2e; border-bottom-color: #1a1a2e; font-weight: 500; }
-  .tab:hover { color: #1a1a2e; }
-  .panel { display: none; }
-  .panel.active { display: block; }
-  .card { background: #fff; border-radius: 8px; padding: 1.5rem; margin-bottom: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
-  .card h2 { font-size: 1rem; font-weight: 600; margin-bottom: 1rem; }
-  table { width: 100%; border-collapse: collapse; }
-  th, td { text-align: left; padding: 0.6rem 0.75rem; border-bottom: 1px solid #f3f4f6; font-size: 0.875rem; }
-  th { color: #6b7280; font-weight: 500; }
-  tr:last-child td { border-bottom: none; }
-  .badge { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 500; }
-  .badge-admin { background: #dbeafe; color: #1e40af; }
-  .badge-user { background: #d1fae5; color: #065f46; }
-  .btn { display: inline-flex; align-items: center; gap: 0.25rem; padding: 0.4rem 0.8rem; border: 1px solid #d1d5db; border-radius: 6px; background: #fff; cursor: pointer; font-size: 0.8rem; color: #374151; }
-  .btn:hover { background: #f9fafb; }
-  .btn-danger { border-color: #fca5a5; color: #991b1b; }
-  .btn-danger:hover { background: #fef2f2; }
-  .btn-sm { padding: 0.25rem 0.5rem; font-size: 0.75rem; }
-  .form-row { display: flex; gap: 0.75rem; margin-bottom: 0.75rem; flex-wrap: wrap; }
-  .form-row input, .form-row select { padding: 0.4rem 0.6rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem; min-width: 140px; }
-  .form-row label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.8rem; color: #6b7280; }
-  .error { color: #dc2626; font-size: 0.875rem; margin-top: 0.5rem; }
-  .success { color: #059669; font-size: 0.875rem; margin-top: 0.5rem; }
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#0d1117;color:#c9d1d9;display:flex;justify-content:center;align-items:center;min-height:100vh}
+.box{background:#161b22;border:1px solid #30363d;border-radius:12px;padding:40px;width:380px;max-width:90vw}
+.box h1{font-size:24px;margin-bottom:8px;color:#f0f6fc;text-align:center}
+.box p{color:#8b949e;font-size:14px;margin-bottom:24px;text-align:center}
+.fg{margin-bottom:16px}
+.fg label{display:block;font-size:13px;color:#c9d1d9;margin-bottom:6px}
+.fg input{width:100%;padding:10px 12px;background:#0d1117;border:1px solid #30363d;border-radius:6px;color:#c9d1d9;font-size:14px;outline:none}
+.fg input:focus{border-color:#58a6ff}
+.btn{width:100%;padding:10px;background:#238636;color:#fff;border:none;border-radius:6px;font-size:14px;cursor:pointer;margin-top:8px}
+.btn:hover{background:#2ea043}
+.err{color:#f85149;font-size:13px;text-align:center;margin-top:12px;display:none}
+.err.show{display:block}
 </style>
 </head>
 <body>
-<div class="header">
-  <h1>DSH 管理控制台</h1>
-  <a href="/">← 返回首页</a>
+<div class="box">
+<h1>DeepSeek Harness</h1>
+<p>请输入用户名和密码登录</p>
+<form id="f">
+<div class="fg"><label>用户名</label><input type="text" id="u" autocomplete="username" required autofocus></div>
+<div class="fg"><label>密码</label><input type="password" id="p" autocomplete="current-password" required></div>
+<button class="btn">登录</button>
+</form>
+<div id="e" class="err"></div>
 </div>
-<div class="container">
-  <div class="tabs">
-    <button class="tab active" data-tab="users">用户管理</button>
-    <button class="tab" data-tab="roles">角色管理</button>
-  </div>
-
-  <!-- Users panel -->
-  <div class="panel active" id="panel-users">
-    <div class="card">
-      <h2>创建用户</h2>
-      <form id="create-user-form">
-        <div class="form-row">
-          <label>用户名<input type="text" name="username" required></label>
-          <label>显示名<input type="text" name="displayName"></label>
-          <label>密码<input type="password" name="password" required minlength="6"></label>
-          <label>角色
-            <select name="roleId" required></select>
-          </label>
-        </div>
-        <button type="submit" class="btn">创建用户</button>
-        <div id="create-user-msg"></div>
-      </form>
-    </div>
-    <div class="card">
-      <h2>用户列表</h2>
-      <table>
-        <thead><tr><th>ID</th><th>用户名</th><th>显示名</th><th>角色</th><th>状态</th><th>操作</th></tr></thead>
-        <tbody id="users-tbody"></tbody>
-      </table>
-    </div>
-  </div>
-
-  <!-- Roles panel -->
-  <div class="panel" id="panel-roles">
-    <div class="card">
-      <h2>角色列表</h2>
-      <table>
-        <thead><tr><th>ID</th><th>标识</th><th>标签</th><th>描述</th><th>操作</th></tr></thead>
-        <tbody id="roles-tbody"></tbody>
-      </table>
-    </div>
-  </div>
-</div>
-
 <script>
-(async function() {
-  const TABS = document.querySelectorAll('.tab');
-  TABS.forEach(t => t.addEventListener('click', () => {
-    TABS.forEach(x => x.classList.remove('active'));
-    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-    t.classList.add('active');
-    document.getElementById('panel-' + t.dataset.tab).classList.add('active');
-  }));
-
-  async function api(url, opts) {
-    const r = await fetch(url, {
-      headers: { 'Content-Type': 'application/json', ...opts?.headers },
-      ...opts,
-    });
-    const j = await r.json();
-    if (!r.ok) throw new Error(j.error || '请求失败');
-    return j;
-  }
-
-  async function loadRoles(selectEl) {
-    const roles = await api('/auth/admin/roles');
-    selectEl.innerHTML = roles.map(r => \`<option value="\${r.id}">\${r.label}</option>\`).join('');
-  }
-
-  async function loadUsers() {
-    const users = await api('/auth/admin/users');
-    document.getElementById('users-tbody').innerHTML = users.map(u => \`
-      <tr>
-        <td>\${u.id}</td>
-        <td>\${u.username}</td>
-        <td>\${u.displayName ?? '—'}</td>
-        <td><span class="badge \${u.roleId === 1 ? 'badge-admin' : 'badge-user'}">\${u.roleName}</span></td>
-        <td>\${u.status === 1 ? '正常' : '禁用'}</td>
-        <td>
-          <button class="btn btn-sm btn-danger" onclick="deleteUser(\${u.id})">删除</button>
-        </td>
-      </tr>
-    \`).join('');
-  }
-
-  async function deleteUser(id) {
-    if (!confirm('确定删除该用户？')) return;
-    await api(\`/auth/admin/users/\${id}\`, { method: 'DELETE' });
-    loadUsers();
-  }
-
-  window.deleteUser = deleteUser;
-
-  const roleSelect = document.querySelector('select[name="roleId"]');
-  await loadRoles(roleSelect);
-  await loadUsers();
-
-  document.getElementById('create-user-form').addEventListener('submit', async e => {
-    e.preventDefault();
-    const fd = new FormData(e.target);
-    const msg = document.getElementById('create-user-msg');
-    try {
-      await api('/auth/admin/users', {
-        method: 'POST',
-        body: JSON.stringify({
-          username: fd.get('username'),
-          displayName: fd.get('displayName') || undefined,
-          password: fd.get('password'),
-          roleId: Number(fd.get('roleId')),
-        }),
-      });
-      msg.className = 'success';
-      msg.textContent = '用户创建成功';
-      e.target.reset();
-      await loadRoles(roleSelect);
-      await loadUsers();
-    } catch(err) {
-      msg.className = 'error';
-      msg.textContent = err.message;
-    }
-  });
-})();
+document.getElementById("f").addEventListener("submit",async function(e){e.preventDefault();var x=document.getElementById("e");x.classList.remove("show");try{var r=await fetch("/api/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:document.getElementById("u").value,password:document.getElementById("p").value})});if(!r.ok){var d=await r.json();x.textContent=d.error||"登录失败";x.classList.add("show");return}window.location.href="/"}catch(err){x.textContent="网络错误";x.classList.add("show")}})
 </script>
 </body>
 </html>`
+
+/** Fixed page menu catalog; a user sees the entries their role's permissions allow. */
+const PAGE_MENUS: ReadonlyArray<{ key: string; permission: string; label: string; path: string }> = [
+  { key: 'chat', permission: 'page:chat', label: '对话', path: '/' },
+  { key: 'history', permission: 'page:history', label: '会话历史', path: '/history' },
+  { key: 'settings', permission: 'page:settings', label: '设置', path: '/settings' },
+  { key: 'tools', permission: 'page:tools', label: '工具', path: '/tools' },
+  { key: 'admin', permission: 'page:admin', label: '管理控制台', path: '/admin' },
+]
+
+/** The menus the signed-in user may open, derived from their page permissions. */
+function menusFor(user: AuthUser): Array<{ key: string; label: string; path: string }> {
+  return PAGE_MENUS.filter(entry => user.permissions.includes(entry.permission))
+    .map(({ key, label, path }) => ({ key, label, path }))
+}
+
+/** Inject the auth bootstrap before the SPA's </head> (or append when absent). */
+function injectBootstrap(html: string): string {
+  const script = `<script>${AUTH_BOOTSTRAP_SCRIPT}</script>`
+  if (html.includes('</head>')) return html.replace('</head>', `${script}</head>`)
+  return `${html}${script}`
+}
+
+/** Built-in appearance preferences, mirroring the ui-theme settings document. */
+type ThemePreference = 'light' | 'dark' | 'system'
+
+/**
+ * Read the persisted appearance preference from the Host user-settings
+ * document (settings.yaml, namespace ui-theme, field preference). The admin
+ * page renders this on every load so it follows the same appearance the SPA
+ * shows. Absent or unparseable documents fall back to system.
+ * @param settingsPath - the settings document path (derived from the auth DB's home).
+ * @returns the stored preference, or system.
+ */
+function themePreference(settingsPath: string): ThemePreference {
+  try {
+    const text = readFileSync(settingsPath, 'utf8')
+    const section = /^\s*ui-theme:[ \t]*\r?\n([\s\S]*?)(?=^\S[^\n]*:|\z)/m.exec(text)
+    const within = section?.[1] ?? text
+    const pref = /^\s*preference:[ \t]*['"]?(light|dark|system)['"]?[ \t]*$/m.exec(within)
+    if (pref !== null) return pref[1] as ThemePreference
+  } catch {
+    // No document yet — the default applies.
+  }
+  return 'system'
+}
+
+/**
+ * Inline boot-theme script for the standalone admin page, matching the SPA's
+ * own theme bootstrap: it resolves system via prefers-color-scheme, then
+ * toggles body[data-ds-dark-theme] and color-scheme so the page CSS flips
+ * to the dark palette exactly when the application would.
+ * @param preference - the persisted appearance preference.
+ * @returns a <script> element string.
+ */
+function bootThemeScript(preference: ThemePreference): string {
+  const json = JSON.stringify(preference)
+  return `<script>(() => {
+  const preference = ${json}
+  const systemDark = preference === 'system'
+    && typeof matchMedia !== 'undefined'
+    && matchMedia('(prefers-color-scheme: dark)').matches
+  const dark = preference === 'dark' || systemDark
+  document.documentElement.style.colorScheme = dark ? 'dark' : 'light'
+  document.body.toggleAttribute('data-ds-dark-theme', dark)
+})()</script>`
 }
 
 /** Plugin config schema (passed through to AuthPluginOptions). */

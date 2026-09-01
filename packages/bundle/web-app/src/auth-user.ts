@@ -29,6 +29,8 @@ export interface AuthUser {
   readonly roleId: RoleId
   /** The current role name, resolved at attach time. */
   readonly roleName: string
+  /** The role's display label, resolved at attach time. */
+  readonly roleLabel: string | null
   readonly permissions: readonly Permission[]
   readonly status: number
 }

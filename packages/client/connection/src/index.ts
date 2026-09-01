@@ -1,4 +1,5 @@
 /** Host HTTP bridge for browser-client RPC. */
+import type { IncomingMessage } from 'node:http'
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-attachment'
@@ -7,7 +8,8 @@ import type {} from '@deepseek-ai/dsh-credentials'
 import type { WebRoute } from '@deepseek-ai/dsh-host-webserver'
 import { API_PATH } from './api-path.ts'
 import { bridge, DEFAULT_MAX_REQUEST_BODY_BYTES } from './http-bridge.ts'
-import { assertTrustedAuthority } from './api-request-trust.ts'
+import { assertTrustedAuthority, isTrustedApiRequest } from './api-request-trust.ts'
+import { authUserOf } from '@deepseek-ai/dsh-host-webserver'
 import { BrowserAuth } from './browser-auth.ts'
 import { HostConnectionService } from './rpc-host.ts'
 
@@ -48,6 +50,61 @@ export const name = 'client-connection'
 
 /** Headroom for RPC JSON fields around aggregate base64 image payloads. */
 const REQUEST_ENVELOPE_HEADROOM_BYTES = 1024 * 1024
+
+/**
+ * Native methods that launch or open host resources. Only a loopback
+ * request may reach them: they can start a session as this process, and
+ * pinning them keeps a LAN client from running commands or opening paths on
+ * the host even with a valid browser session.
+ */
+const NATIVE_METHODS = new Set([
+  'agentPreset.read',
+  'agentPreset.copy',
+  'agentPreset.openDocument',
+  'agentPreset.remove',
+  'host.pickDirectory',
+  'host.openPath',
+  'settings.openDocument',
+])
+
+/**
+ * Configuration-plane methods: settings, credentials, and model discovery.
+ * A session the auth guard attached must carry the settings permission; a
+ * session-less loopback request passes the empty trust list instead.
+ */
+const CONFIGURATION_METHODS = new Set([
+  'settings.describe',
+  'settings.update',
+  'settings.replace',
+  'settings.mutate',
+  'credentials.describe',
+  'credentials.set',
+  'credentials.unset',
+  'llm.discoverModels',
+])
+
+/** The permission a session needs to read or write the configuration plane. */
+const SETTINGS_PERMISSION = 'page:settings'
+
+/** The RPC method a /api request path names, or undefined for other paths. */
+function methodFromPath(pathname: string): string | undefined {
+  return pathname.startsWith(`${API_PATH}/`) ? pathname.slice(API_PATH.length + 1) : undefined
+}
+
+/**
+ * Whether one request may reach a configuration-plane method. A session the
+ * auth guard attached is the authoritative signal: the settings permission is
+ * enforced by role even when a reverse proxy rewrites Host to loopback, which
+ * would otherwise short-circuit the check. Without a session (the desktop has
+ * no auth plugin), only a loopback request passes.
+ * @param req - the gated request.
+ * @returns whether the configuration plane may serve it.
+ */
+function configurationAuthorized(req: IncomingMessage): boolean {
+  const user = authUserOf(req)
+  if (user !== undefined) return user.permissions.includes(SETTINGS_PERMISSION)
+  return isTrustedApiRequest(req, [])
+}
 
 function assertImageBodyCapacity(ctx: Context, maxRequestBodyBytes: number): void {
   const attachments = ctx.get('attachments')
@@ -120,6 +177,20 @@ export async function apply(ctx: Context, config?: ConnectionConfig): Promise<vo
         res.writeHead(rejection)
         res.end(rejection === 401 ? 'unauthorized' : 'forbidden')
         return
+      }
+      const pathname = new URL(req.url ?? '/', 'http://dsh.internal').pathname
+      const method = methodFromPath(pathname)
+      if (method !== undefined) {
+        if (NATIVE_METHODS.has(method) && !isTrustedApiRequest(req, [])) {
+          res.writeHead(403)
+          res.end('forbidden')
+          return
+        }
+        if (CONFIGURATION_METHODS.has(method) && !configurationAuthorized(req)) {
+          res.writeHead(403)
+          res.end('forbidden')
+          return
+        }
       }
       await bridge(req, res, fetchHandler, maxRequestBodyBytes)
     },

@@ -18,6 +18,30 @@ import { renderIndexInjections, type IndexInjection } from './injections.ts'
 
 export { renderIndexInjections } from './injections.ts'
 export type { IndexInjection, IndexInjectionPlacement } from './injections.ts'
+export { AUTH_USER, type AuthUserFace, authUserOf } from './request-auth.ts'
+
+/** One request guard: a per-request gate run before route or fallback dispatch
+ * (HTTP) and before upgrade dispatch. Guards compose as a waterfall — each
+ * guard either short-circuits (writes a response or destroys the socket and
+ * returns without calling next) or delegates via next; next resolves the
+ * remaining guards and then the dispatch target. Registration order is the run
+ * order. Guards give a composing layer (e.g. authentication) a single
+ * transport-level gate that no named route, the fallback seat, or an upgrade
+ * route can bypass.
+ */
+export interface WebGuardTarget {
+  /** The gated request (present for both HTTP and upgrade dispatch). */
+  req: IncomingMessage
+  /** HTTP dispatch target; undefined during an upgrade. */
+  res?: ServerResponse
+  /** Upgrade dispatch target (the raw socket); undefined for ordinary HTTP. */
+  socket?: Duplex
+  /** Upgrade head bytes; undefined for ordinary HTTP. */
+  head?: Buffer
+}
+
+/** Run one guard; returning without calling next short-circuits dispatch. */
+export type WebGuard = (target: WebGuardTarget, next: () => void | Promise<void>) => void | Promise<void>
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
@@ -134,6 +158,7 @@ export class WebServer extends Service {
   private readonly prefixes = new Map<string, WebRoute>()
   private readonly upgrades = new Map<string, WebUpgradeRoute>()
   private readonly upgradedSockets = new Set<Duplex>()
+  private readonly guards: WebGuard[] = []
   private readonly indexTaps: ((html: string) => string)[] = []
   private fallback: WebRoute['handler'] | undefined
   private server!: Server
@@ -169,6 +194,23 @@ export class WebServer extends Service {
     }
     table.set(route.path, route)
     return () => { table.delete(route.path) }
+  }
+
+  /**
+   * Register a request guard. Guards run in registration order for every
+   * request (HTTP and upgrade) before route/fallback or upgrade dispatch, so
+   * an unauthenticated request cannot reach any handler by naming a route the
+   * guard does not know about. A guard that neither responds nor calls next
+   * stalls dispatch; guards must call next exactly once to delegate.
+   * @param guard - the gate to run for each request.
+   * @returns the disposer removing the guard.
+   */
+  registerGuard(guard: WebGuard): () => void {
+    this.guards.push(guard)
+    return () => {
+      const at = this.guards.indexOf(guard)
+      if (at !== -1) this.guards.splice(at, 1)
+    }
   }
 
   /**
@@ -218,7 +260,18 @@ export class WebServer extends Service {
 
   /** Listen; resolves once the socket is bound (rejection = FAILED fiber). */
   async [Service.init](): Promise<void> {
+    const runGuards = async (target: WebGuardTarget, index: number): Promise<boolean> => {
+      for (const guard of this.guards.slice(index)) {
+        const delegation = { next: false }
+        await guard(target, () => { delegation.next = true })
+        if (!delegation.next) return false
+      }
+      return true
+    }
     const handle = async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
+      // Guards gate every request before any route, fallback, or upgrade handler
+      // runs, so no named route can bypass a composing guard (authentication).
+      if (!await runGuards({ req, res }, 0)) return
       /* v8 ignore next -- `?? '/'` arm: node:http always sets url on server
       requests; the field is only optional on the client-side IncomingMessage type */
       const rawPath = new URL(req.url ?? '/', 'http://x').pathname
@@ -277,16 +330,32 @@ export class WebServer extends Service {
         socket.destroy()
         return
       }
-      this.upgradedSockets.add(socket)
-      try {
-        Promise.resolve(route.handler(req, socket, head)).catch((error: unknown) => {
+      // A guard that refuses the upgrade destroys the socket without reaching
+      // the route handler, so the transport-level gate covers WebSockets too.
+      const runUpgradeGuards = async (index: number): Promise<boolean> => {
+        for (const guard of this.guards.slice(index)) {
+          const delegation = { next: false }
+          await guard({ req, socket, head }, () => { delegation.next = true })
+          if (!delegation.next) return false
+        }
+        return true
+      }
+      void runUpgradeGuards(0).then((proceed) => {
+        if (!proceed) {
+          socket.destroy()
+          return
+        }
+        this.upgradedSockets.add(socket)
+        try {
+          Promise.resolve(route.handler(req, socket, head)).catch((error: unknown) => {
+            this.ctx.logger.warn(error instanceof Error ? error : new Error(String(error)))
+            socket.destroy()
+          })
+        } catch (error) {
           this.ctx.logger.warn(error instanceof Error ? error : new Error(String(error)))
           socket.destroy()
-        })
-      } catch (error) {
-        this.ctx.logger.warn(error instanceof Error ? error : new Error(String(error)))
-        socket.destroy()
-      }
+        }
+      })
     })
 
     await new Promise<void>((resolve, reject) => {

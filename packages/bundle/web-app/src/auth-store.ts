@@ -1,4 +1,4 @@
-﻿/**
+/**
  * SQLite-backed RBAC store: users, roles, permissions, and sessions.
  * The schema is initialized lazily on first use; the caller owns disposal.
  */
@@ -59,33 +59,6 @@ CREATE TABLE IF NOT EXISTS sessions (
 );
 
 CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at);
-CREATE INDEX IF NOT EXISTS idx_users_role ON users(role_id);
-
--- Seed default roles if none exist
-INSERT OR IGNORE INTO roles (name, label, description) VALUES ('admin', 'Administrator', 'Full system access');
-INSERT OR IGNORE INTO roles (name, label, description) VALUES ('user', 'User', 'Standard user access');
-INSERT OR IGNORE INTO roles (name, label, description) VALUES ('viewer', 'Viewer', 'Read-only access');
-
--- Seed permissions
-INSERT OR IGNORE INTO permissions (name) VALUES ('sessions:read');
-INSERT OR IGNORE INTO permissions (name) VALUES ('sessions:write');
-INSERT OR IGNORE INTO permissions (name) VALUES ('sessions:delete');
-INSERT OR IGNORE INTO permissions (name) VALUES ('users:read');
-INSERT OR IGNORE INTO permissions (name) VALUES ('users:write');
-INSERT OR IGNORE INTO permissions (name) VALUES ('users:delete');
-INSERT OR IGNORE INTO permissions (name) VALUES ('roles:manage');
-
--- Assign permissions to roles
-INSERT OR IGNORE INTO role_permissions (role_id, permission_id)
-  SELECT r.id, p.id FROM roles r CROSS JOIN permissions p WHERE r.name = 'admin';
-
-INSERT OR IGNORE INTO role_permissions (role_id, permission_id)
-  SELECT r.id, p.id FROM roles r CROSS JOIN permissions p
-  WHERE r.name = 'user' AND p.name IN ('sessions:read', 'users:read');
-
-INSERT OR IGNORE INTO role_permissions (role_id, permission_id)
-  SELECT r.id, p.id FROM roles r CROSS JOIN permissions p
-  WHERE r.name = 'viewer' AND p.name = 'sessions:read';
 `
 
 // ── Password hashing ──────────────────────────────────────────────────────────
@@ -138,6 +111,7 @@ interface DbUser {
   display_name: string | null
   role_id: number
   status: number
+  created_at: number
   role_name: string
   role_label: string
   permissions: string | null
@@ -154,11 +128,36 @@ interface DbRole {
   name: string
   label: string
   description: string | null
+  created_at: number
 }
 
 interface DbPermission {
   id: number
   name: string
+}
+
+/** Admin users-list row: role display name plus creation time. */
+export interface UserView {
+  id: number
+  username: string
+  displayName: string | null
+  roleId: number
+  roleName: string
+  roleLabel: string
+  status: number
+  createdAt: number
+  permissions: readonly string[]
+}
+
+/** Admin roles-list row: permission keys plus the system-role marker. */
+export interface RoleView {
+  id: number
+  name: string
+  label: string
+  description: string | null
+  isSystem: boolean
+  permissions: string[]
+  createdAt: number
 }
 
 // ── AuthStore ────────────────────────────────────────────────────────────────
@@ -192,6 +191,9 @@ export class AuthStore {
     userUpdatePassword: StatementSync
     userDelete: StatementSync
     rolesList: StatementSync
+    roleById: StatementSync
+    roleByName: StatementSync
+    rolePermissionsList: StatementSync
     roleInsert: StatementSync
     roleUpdate: StatementSync
     roleDelete: StatementSync
@@ -210,19 +212,23 @@ export class AuthStore {
     this.db.exec('PRAGMA journal_mode = WAL')
     this.db.exec('PRAGMA foreign_keys = ON')
     tagSchemaVersion(this.db)
+    this.db.exec(INIT_SQL)
     // v0 → v1: the initial pre-release layout had no role_id on users; add it
     // when the column is absent so an existing auth.db survives the upgrade.
+    // Runs after INIT_SQL so fresh databases already carry the column; the
+    // users index is created here too because it cannot exist on a pre-v1
+    // table until the column has been added.
     const userColumns = this.db.prepare(`PRAGMA table_info(users)`).all() as Array<{ name: string }>
     if (!userColumns.some((column) => column.name === 'role_id')) {
       this.db.exec('ALTER TABLE users ADD COLUMN role_id INTEGER REFERENCES roles(id)')
-      this.db.exec('UPDATE users SET role_id = (SELECT r.id FROM roles r WHERE r.name = 'user') WHERE role_id IS NULL')
+      this.db.exec("UPDATE users SET role_id = (SELECT r.id FROM roles r WHERE r.name = 'user') WHERE role_id IS NULL")
     }
-    this.db.exec(INIT_SQL)
+    this.db.exec('CREATE INDEX IF NOT EXISTS idx_users_role ON users(role_id)')
 
     // Prepared statements
     this.stmts = {
       userById: this.db.prepare(/* sql */ `
-        SELECT u.id, u.username, u.password_hash, u.display_name, u.role_id, u.status,
+        SELECT u.id, u.username, u.password_hash, u.display_name, u.role_id, u.status, u.created_at,
                r.name AS role_name, r.label AS role_label,
                (SELECT GROUP_CONCAT(p.name) FROM role_permissions rp
                   JOIN permissions p ON p.id = rp.permission_id
@@ -235,7 +241,13 @@ export class AuthStore {
       sessionDelete: this.db.prepare(/* sql */ `DELETE FROM sessions WHERE token = ?`),
       sessionGet: this.db.prepare(/* sql */ `SELECT user_id, expires_at FROM sessions WHERE token = ?`),
       sessionPurge: this.db.prepare(/* sql */ `DELETE FROM sessions WHERE expires_at < ?`),
-      usersList: this.db.prepare(/* sql */ `SELECT id FROM users WHERE status != 0 ORDER BY id`),
+      usersList: this.db.prepare(/* sql */ `
+        SELECT u.id, u.username, u.display_name, u.role_id, u.status, u.created_at,
+               r.name AS role_name, r.label AS role_label
+        FROM users u JOIN roles r ON r.id = u.role_id
+        WHERE u.status != 0
+        ORDER BY u.id
+      `),
       userInsert: this.db.prepare(/* sql */ `
         INSERT INTO users (username, password_hash, display_name, role_id, status)
         VALUES (?, ?, ?, ?, ?)
@@ -247,12 +259,18 @@ export class AuthStore {
         UPDATE users SET password_hash = ?, updated_at = unixepoch() WHERE id = ?
       `),
       userDelete: this.db.prepare(/* sql */ `DELETE FROM users WHERE id = ?`),
-      rolesList: this.db.prepare(/* sql */ `SELECT id, name, label, description FROM roles ORDER BY id`),
+      rolesList: this.db.prepare(/* sql */ `SELECT id, name, label, description, created_at FROM roles ORDER BY id`),
+      roleById: this.db.prepare(/* sql */ `SELECT id, name, label, description, created_at FROM roles WHERE id = ?`),
+      roleByName: this.db.prepare(/* sql */ `SELECT id FROM roles WHERE name = ?`),
+      rolePermissionsList: this.db.prepare(/* sql */ `
+        SELECT p.name FROM role_permissions rp JOIN permissions p ON p.id = rp.permission_id
+        WHERE rp.role_id = ? ORDER BY p.id
+      `),
       roleInsert: this.db.prepare(/* sql */ `INSERT INTO roles (name, label, description) VALUES (?, ?, ?)`),
       roleUpdate: this.db.prepare(/* sql */ `UPDATE roles SET label = ?, description = ? WHERE id = ?`),
       roleDelete: this.db.prepare(/* sql */ `DELETE FROM roles WHERE id = ?`),
       rolePermissionsDelete: this.db.prepare(/* sql */ `DELETE FROM role_permissions WHERE role_id = ?`),
-      rolePermissionsInsert: this.db.prepare(/* sql */ `INSERT INTO role_permissions (role_id, permission_id) VALUES (?, ?)`),
+      rolePermissionsInsert: this.db.prepare(/* sql */ `INSERT OR IGNORE INTO role_permissions (role_id, permission_id) VALUES (?, ?)`),
       permissionsList: this.db.prepare(/* sql */ `SELECT id, name FROM permissions ORDER BY id`),
       permissionInsert: this.db.prepare(/* sql */ `INSERT OR IGNORE INTO permissions (name) VALUES (?)`),
       permissionByName: this.db.prepare(/* sql */ `SELECT id FROM permissions WHERE name = ?`),
@@ -309,16 +327,28 @@ export class AuthStore {
 
   // ── User management (admin) ───────────────────────────────────────────────
 
-  listUsers(): AuthUser[] {
-    const rows = this.stmts.usersList.all() as { id: number }[]
-    const result: AuthUser[] = []
-    for (const row of rows) {
-      const user = this.stmts.userById.get(row.id) as DbUser | undefined
-      if (!user) continue
-      const resolved = this.toAuthUser(user)
-      if (resolved !== null) result.push(resolved)
-    }
-    return result
+  listUsers(): UserView[] {
+    const rows = this.stmts.usersList.all() as unknown as Array<{
+      id: number
+      username: string
+      display_name: string | null
+      role_id: number
+      status: number
+      created_at: number
+      role_name: string
+      role_label: string
+    }>
+    return rows.map(row => ({
+      id: row.id,
+      username: row.username,
+      displayName: row.display_name,
+      roleId: row.role_id,
+      roleName: row.role_name,
+      roleLabel: row.role_label,
+      status: row.status,
+      createdAt: row.created_at,
+      permissions: this.permissionsForRole(row.role_id),
+    }))
   }
 
   createUser(input: {
@@ -327,20 +357,20 @@ export class AuthStore {
     roleId: number
     displayName?: string
     status?: number
-  }): AuthUser {
+  }): UserView {
+    const username = input.username.trim()
+    if (!username) throw new Error('用户名不能为空')
+    if (input.password.length < 6) throw new Error('密码长度至少 6 位')
     const salt = randomBytes(16)
     const hash = hashPassword(input.password, salt)
     const info = this.stmts.userInsert.run(
-      input.username,
+      username,
       encodeHash(salt, hash),
       input.displayName ?? null,
       input.roleId,
       input.status ?? 1,
     )
-    const user = this.stmts.userById.get(info.lastInsertRowid) as unknown as DbUser
-    const resolved = this.toAuthUser(user)
-    if (resolved === null) throw new Error('created user but has no active session')
-    return resolved
+    return this.userViewFromRow(this.stmts.userById.get(info.lastInsertRowid) as unknown as DbUser)
   }
 
   updateUser(
@@ -351,7 +381,7 @@ export class AuthStore {
       status?: number
       password?: string
     },
-  ): AuthUser {
+  ): UserView {
     const existing = this.stmts.userById.get(id) as DbUser | undefined
     if (!existing) throw new Error('user not found')
     this.stmts.userUpdate.run(
@@ -364,10 +394,7 @@ export class AuthStore {
       const salt = randomBytes(16)
       this.stmts.userUpdatePassword.run(encodeHash(salt, hashPassword(updates.password, salt)), id)
     }
-    const user = this.stmts.userById.get(id) as unknown as DbUser
-    const resolved = this.toAuthUser(user)
-    if (resolved === null) throw new Error('updated user but has no active session')
-    return resolved
+    return this.userViewFromRow(this.stmts.userById.get(id) as unknown as DbUser)
   }
 
   deleteUser(id: number): void {
@@ -385,8 +412,9 @@ export class AuthStore {
 
   // ── Role management ───────────────────────────────────────────────────────
 
-  listRoles(): DbRole[] {
-    return this.stmts.rolesList.all() as unknown as DbRole[]
+  listRoles(): RoleView[] {
+    const rows = this.stmts.rolesList.all() as unknown as DbRole[]
+    return rows.map(row => this.roleViewFromRow(row))
   }
 
   createRole(input: {
@@ -394,19 +422,18 @@ export class AuthStore {
     label: string
     description?: string
     permissions?: Permission[]
-  }): DbRole {
+  }): RoleView {
     const info = this.stmts.roleInsert.run(input.name, input.label, input.description ?? null)
-    if (input.permissions?.length) {
-      this.assignPermissions(info.lastInsertRowid as number, input.permissions)
-    }
-    return this.stmts.rolesList.get(info.lastInsertRowid) as unknown as DbRole
+    const id = info.lastInsertRowid as number
+    if (input.permissions?.length) this.assignPermissions(id, input.permissions)
+    return this.roleViewFromRow(this.stmts.roleById.get(id) as unknown as DbRole)
   }
 
   updateRole(
     id: number,
     updates: { label?: string; description?: string; permissions?: Permission[] },
-  ): DbRole {
-    const existing = this.stmts.rolesList.get(id) as unknown as DbRole | undefined
+  ): RoleView {
+    const existing = this.stmts.roleById.get(id) as unknown as DbRole | undefined
     if (!existing) throw new Error('role not found')
     if (updates.label !== undefined || updates.description !== undefined) {
       this.stmts.roleUpdate.run(
@@ -419,7 +446,7 @@ export class AuthStore {
       this.stmts.rolePermissionsDelete.run(id)
       if (updates.permissions.length) this.assignPermissions(id, updates.permissions)
     }
-    return this.stmts.rolesList.get(id) as unknown as DbRole
+    return this.roleViewFromRow(this.stmts.roleById.get(id) as unknown as DbRole)
   }
 
   deleteRole(id: number): void {
@@ -441,6 +468,7 @@ export class AuthStore {
       displayName: user.display_name,
       roleId: user.role_id as RoleId,
       roleName: user.role_name,
+      roleLabel: user.role_label,
       permissions: user.permissions ? (user.permissions.split(',') as readonly Permission[]) : [],
       status: user.status,
     }
@@ -455,36 +483,74 @@ export class AuthStore {
   }
 
   private seedDefaults(): void {
-    const existing = this.db.prepare(/* sql */ `SELECT 1 FROM roles WHERE name = 'admin'`).get()
-    if (existing) return
-    // Permissions
+    // Idempotent seeding: every open fills missing catalog entries, missing
+    // roles, role permissions, and the default admin account, so a database
+    // created by an earlier pre-release layout (which seeded roles only and
+    // skipped the user) converges to the same state without a destructive
+    // reset. Role permission rows are re-inserted only when the role has none.
     const perms = [
       'page:admin', 'api:admin',
+      'page:chat', 'page:history', 'page:settings', 'page:tools',
       'session:list', 'session:read', 'session:delete',
       'settings:read', 'settings:write',
     ] as const
-    const userRolePerms = ['session:list', 'session:read', 'settings:read', 'settings:write']
+    const userRolePerms = ['page:chat', 'page:history', 'page:settings', 'page:tools', 'session:list', 'session:read', 'settings:read', 'settings:write']
     for (const p of perms) this.stmts.permissionInsert.run(p)
 
-    // Admin role (gets every permission)
-    const adminInfo = this.stmts.roleInsert.run('admin', '管理员', '完整系统管理权限')
-    const adminId = adminInfo.lastInsertRowid as number
-    for (const p of perms) {
-      const row = this.stmts.permissionByName.get(p) as { id: number } | undefined
-      if (row) this.stmts.rolePermissionsInsert.run(adminId, row.id)
-    }
+    const adminId = this.ensureRole('admin', '管理员', '完整系统管理权限')
+    for (const p of perms) this.assignPermissions(adminId, [p])
+    const userId = this.ensureRole('user', '普通用户', '基础使用权限')
+    for (const p of userRolePerms) this.assignPermissions(userId, [p])
 
-    // User role (subset)
-    const userInfo = this.stmts.roleInsert.run('user', '普通用户', '基础使用权限')
-    const userId = userInfo.lastInsertRowid as number
-    for (const p of userRolePerms) {
-      const row = this.stmts.permissionByName.get(p) as { id: number } | undefined
-      if (row) this.stmts.rolePermissionsInsert.run(userId, row.id)
+    // Default admin account; absent in databases seeded by the old pre-release
+    // layout, which created the admin role but never a user.
+    const adminUser = this.db.prepare(`SELECT id FROM users WHERE username = 'admin'`).get() as { id: number } | undefined
+    if (adminUser === undefined) {
+      const salt = randomBytes(16)
+      const hash = hashPassword('admin123', salt)
+      this.stmts.userInsert.run('admin', encodeHash(salt, hash), '系统管理员', adminId, 1)
     }
-
-    // Default admin account
-    const salt = randomBytes(16)
-    const hash = hashPassword('admin123', salt)
-    this.stmts.userInsert.run('admin', encodeHash(salt, hash), '系统管理员', adminId, 1)
   }
+
+  /** Resolve one role id by name, creating the role when absent. */
+  private ensureRole(name: string, label: string, description: string): number {
+    const row = this.stmts.roleByName.get(name) as { id: number } | undefined
+    if (row !== undefined) return row.id
+    return this.stmts.roleInsert.run(name, label, description).lastInsertRowid as number
+  }
+
+  /** Permission keys held by one role, in catalog order. */
+  private permissionsForRole(roleId: number): string[] {
+    const rows = this.stmts.rolePermissionsList.all(roleId) as unknown as Array<{ name: string }>
+    return rows.map(row => row.name)
+  }
+
+  /** Build the admin roles-list view from a DB row. */
+  private roleViewFromRow(row: DbRole): RoleView {
+    return {
+      id: row.id,
+      name: row.name,
+      label: row.label,
+      description: row.description,
+      isSystem: row.name === 'admin' || row.name === 'user',
+      permissions: this.permissionsForRole(row.id),
+      createdAt: row.created_at,
+    }
+  }
+
+  /** Build the admin users-list view from a DB row. */
+  private userViewFromRow(row: DbUser): UserView {
+    return {
+      id: row.id,
+      username: row.username,
+      displayName: row.display_name,
+      roleId: row.role_id,
+      roleName: row.role_name,
+      roleLabel: row.role_label,
+      status: row.status,
+      createdAt: row.created_at,
+      permissions: row.permissions ? (row.permissions.split(',') as readonly string[]) : [],
+    }
+  }
+
 }
