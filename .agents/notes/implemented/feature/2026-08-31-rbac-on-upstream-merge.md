@@ -111,6 +111,46 @@ auth 已经通过 `web-app/src/index.ts` 的 `applyAuth(ctx)` 调用自动注册
 - ✅ 失败路径（弱密码 400、错误 cookie 401、非 admin 403、fall-through 404）
 - ⚠️ BrowserAuth 与本地的 cookie 共享（未测 — 需要服务器拉完整 web 启动链路）
 
+## 实际部署状态
+
+### 代码完成（已推 origin）
+
+| 分支 | 提交 | 描述 |
+|---|---|---|
+| `origin/merge-upstream-rbac-v2` | `edefbdde66` | feat: RBAC auth plugin 主体 |
+| | `ebbd035e4e` | fix: unique symbol / DbRole casts |
+| | `8c4ef5de78` | fix: exactOptionalPropertyTypes / DbUser casts |
+| | `da110714c4` | fix: DbRole[] cast / remove unused description |
+| `origin/dsh-temp-fix` | (服务器本地增量) | fix: FiberState / settingsNamespace / auth-store schema |
+
+### 服务器状态
+
+服务器 `/root/deepseek-harness` 当前在 `main` 分支 HEAD = `3867847c0c1`。
+`dsh-temp-fix` 分支已推上 origin，包含 4 个 RBAC 相关 commit + 3 个 fix commit。
+
+### 部署未完成
+
+**DSH sandbox 限制导致：**
+- `pnpm run build` 完整构建 OOM（需要 6GB+ 内存）
+- `git push` 报 SSH Win32 error 5
+- `node --max-old-space-size` 受 sandbox 限制
+
+**必须的操作（在普通终端执行）：**
+1. SSH 到服务器 `root@106.52.12.149`
+2. `cd /root/deepseek-harness && git checkout dsh-temp-fix`
+3. `pnpm install --ignore-scripts`
+4. `NODE_OPTIONS=--max-old-space-size=6144 pnpm run build`（如果 OOM 用 `--filter`）
+5. `/root/dsh-ctl.sh restart`
+
+详细步骤见 `docs/private-notes/2026-08-31-rbac-actual-deploy.md`
+
+### UI 集成未完成
+
+5 个 UI commit（`9447341fac`, `f29af82290`, `13d1828324`, `cdb97f6db7`, `e89db207f8`）未移植到 `merge-upstream-rbac-v2`。
+这些修改 `AppFrame.tsx` / `SettingsRoot.tsx` / `settings-availability.ts`，需要从 `feature/auth-and-permission` 分支 cherry-pick。
+
+
+
 ## 关联 agent note
 
 - [2026-08-24-browser-token-authentication](../architecture/2026-08-24-browser-token-authentication.md) —
