@@ -261,7 +261,7 @@ describe('ToolRuntime', () => {
 
     const result = await ctx.tools.execute({
       signal: testToolSignal,
-      callId: CallId('default-render'),
+      callId: ToolCallId('default-render'),
       name: 'default-render',
       arguments: { text: 'hello' },
     })
