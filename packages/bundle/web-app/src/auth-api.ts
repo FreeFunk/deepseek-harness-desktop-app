@@ -96,6 +96,29 @@ function clearSessionCookie(res: ServerResponse): void {
   )
 }
 
+/**
+ * Login URL preserving the caller's query string. The connection launch token
+ * (`?token=`) is the browser-session exchange input; dropping it across the
+ * login redirect would strand `/api` requests with "authentication required".
+ * @param req - the redirected request.
+ * @returns `/login` plus the original query (empty when the caller had none).
+ */
+function loginUrlWithQuery(req: IncomingMessage): string {
+  const url = new URL(req.url ?? '/', 'http://x')
+  return `/login${url.search}`
+}
+
+/**
+ * Root URL preserving the caller's query string, so a signed-in user hitting
+ * `/login?token=...` returns to the app and re-enters the token exchange.
+ * @param req - the redirected request.
+ * @returns `/` plus the original query.
+ */
+function rootUrlWithQuery(req: IncomingMessage): string {
+  const url = new URL(req.url ?? '/', 'http://x')
+  return `/${url.search}`
+}
+
 // ── SPA bootstrap (re-exported from auth-bootstrap.ts) ───────────────────────
 
 export { authBootstrapScript } from './auth-bootstrap.ts'
@@ -498,7 +521,7 @@ export function apply(
       }
       const accept = target.req.headers.accept ?? ''
       if (accept.includes('text/html')) {
-        target.res.writeHead(302, { Location: '/login' })
+        target.res.writeHead(302, { Location: loginUrlWithQuery(target.req) })
         target.res.end()
         return
       }
@@ -521,7 +544,7 @@ export function apply(
     if (pathname === '/login' || pathname === '/auth/login') {
       if (req.method === 'GET') {
         if (user !== null) {
-          res.writeHead(302, { Location: '/' })
+          res.writeHead(302, { Location: rootUrlWithQuery(req) })
           res.end()
           return true
         }
@@ -594,7 +617,7 @@ export function apply(
 
     // ── /admin ──────────────────────────────────────────────────────────────
     if (pathname === '/admin' && options.adminConsole !== false) {
-      if (user === null) { res.writeHead(302, { Location: '/login' }); res.end(); return true }
+      if (user === null) { res.writeHead(302, { Location: loginUrlWithQuery(req) }); res.end(); return true }
       if (!requirePermission(user, 'page:admin')) {
         res.writeHead(403, { 'Content-Type': 'text/html; charset=utf-8' })
         res.end(/* html */`<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>无权限</title></head>
@@ -685,7 +708,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;b
 <div id="e" class="err"></div>
 </div>
 <script>
-document.getElementById("f").addEventListener("submit",async function(e){e.preventDefault();var x=document.getElementById("e");x.classList.remove("show");try{var r=await fetch("/api/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:document.getElementById("u").value,password:document.getElementById("p").value})});if(!r.ok){var d=await r.json();x.textContent=d.error||"登录失败";x.classList.add("show");return}window.location.href="/"}catch(err){x.textContent="网络错误";x.classList.add("show")}})
+document.getElementById("f").addEventListener("submit",async function(e){e.preventDefault();var x=document.getElementById("e");x.classList.remove("show");try{var r=await fetch("/api/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:document.getElementById("u").value,password:document.getElementById("p").value})});if(!r.ok){var d=await r.json();x.textContent=d.error||"登录失败";x.classList.add("show");return}window.location.href="/"+window.location.search}catch(err){x.textContent="网络错误";x.classList.add("show")}})
 </script>
 </body>
 </html>`

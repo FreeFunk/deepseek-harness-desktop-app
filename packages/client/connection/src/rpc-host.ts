@@ -14,6 +14,7 @@ import { isTrustedApiRequest } from './api-request-trust.ts'
 import { API_PATH } from './api-path.ts'
 import { authUserOf } from '@deepseek-ai/dsh-host-webserver'
 import type { BrowserAuth } from './browser-auth.ts'
+import { TOKEN_QUERY } from './browser-auth.ts'
 import type {
   ConnectionIndexRequest,
   ConnectionIndexResponse,
@@ -105,6 +106,14 @@ export class HostConnectionService extends Service implements HostConnectionHand
 
   /** Authenticate an index request through the process-token exchange or cookie. */
   authorizeIndex(request: ConnectionIndexRequest, response: ConnectionIndexResponse): boolean {
+    // A session the auth transport guard attached is authoritative: the guard
+    // already verified login, so index serving must not be rejected for the
+    // missing browser-token exchange. A launch token still present completes
+    // the exchange (BrowserAuth mints the cookie and 303s to the clean URL).
+    if (authUserOf(request as ConnectionIndexRequest & IncomingMessage) !== undefined
+      && !new URL(request.url ?? '/', 'http://dsh.invalid').searchParams.has(TOKEN_QUERY)) {
+      return true
+    }
     return this.browserAuth.authorizeIndex(request, response)
   }
 

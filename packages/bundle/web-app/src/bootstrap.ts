@@ -22,7 +22,7 @@ export const AUTH_BOOTSTRAP_SCRIPT = `(function(){
       return ORIGINAL(input, init).then(function(res){
         var url = typeof input === 'string' ? input : (input && input.url ? input.url : '')
         if (res.status === 401 && url.indexOf('/api/') === 0 && url.indexOf('/api/auth/login') !== 0){
-          try { location.href = '/login' } catch (e) { /* navigation in progress */ }
+          try { location.href = '/login' + location.search } catch (e) { /* navigation in progress */ }
         }
         return res
       })
@@ -30,7 +30,7 @@ export const AUTH_BOOTSTRAP_SCRIPT = `(function(){
   }
   function fetchJSON(url){
     return fetch(url, { credentials: 'same-origin' }).then(function(res){
-      if (res.status === 401){ location.href = '/login'; throw new Error('unauthorized') }
+      if (res.status === 401){ location.href = '/login' + location.search; throw new Error('unauthorized') }
       if (!res.ok) throw new Error('request failed: ' + res.status)
       return res.json()
     })
@@ -138,8 +138,8 @@ export const AUTH_BOOTSTRAP_SCRIPT = `(function(){
     items.push(['修改密码', function(){ location.href = '/admin#password' }])
     items.push(['退出登录', function(){
       fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' })
-        .then(function(){ location.href = '/login' })
-        .catch(function(){ location.href = '/login' })
+        .then(function(){ location.href = '/login' + location.search })
+        .catch(function(){ location.href = '/login' + location.search })
     }])
     for (var i = 0; i < items.length; i++){
       (function(label, action){

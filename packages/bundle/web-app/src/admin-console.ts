@@ -165,7 +165,7 @@ td .ops{display:flex;gap:6px}
     opts.headers['Content-Type'] = 'application/json'
     opts.credentials = 'same-origin'
     return fetch(path, opts).then(function(r){
-      if (r.status === 401){ location.href = '/login'; throw new Error('unauthorized') }
+      if (r.status === 401){ location.href = '/login' + location.search; throw new Error('unauthorized') }
       return r.json().then(function(d){
         if (!r.ok){ throw new Error(d && d.error ? d.error : ('HTTP ' + r.status)) }
         return d
@@ -319,7 +319,7 @@ td .ops{display:flex;gap:6px}
     var t = e.target
     if (t && t.dataset && t.dataset.tab){ switchTab(t.dataset.tab); return }
     if (t && t.id === 'logout-btn'){
-      fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' }).then(function(){ location.href = '/login' }).catch(function(){ location.href = '/login' })
+      fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' }).then(function(){ location.href = '/login' + location.search }).catch(function(){ location.href = '/login' + location.search })
       return
     }
     if (t && t.dataset && t.dataset.op){

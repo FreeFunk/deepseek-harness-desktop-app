@@ -8,6 +8,7 @@ import type { AddressInfo } from 'node:net'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { AttachmentStore } from '@deepseek-ai/dsh-attachment'
 import type { WebServer, WebRoute, WebUpgradeRoute } from '@deepseek-ai/dsh-host-webserver'
+import { AUTH_USER } from '@deepseek-ai/dsh-host-webserver'
 import { API_PATH, RpcId, apply, inject, type ClientRequest, type HostConnectionHandle } from '../src/index.ts'
 import { DEFAULT_MAX_REQUEST_BODY_BYTES } from '../src/http-bridge.ts'
 import { provideBrowserCredentials } from './browser-credentials.ts'
@@ -235,6 +236,36 @@ describe('connection node half', () => {
       host: 'harness.example',
       cookie: browserCookie(connection, 'harness.example'),
     }))).toBeUndefined()
+    await dispose()
+  })
+
+  it('serves the index for a session the auth transport guard attached, without the browser-token exchange', async () => {
+    const { connection, dispose } = await mounted()
+    // The auth guard's session marker is authoritative for index serving: no
+    // browser token or cookie is required.
+    const withSession = fakeRequest({ host: '127.0.0.1:3080' }, '/')
+    Object.defineProperty(withSession, AUTH_USER, {
+      value: { permissions: ['page:chat'] },
+      configurable: true,
+    })
+    const served = fakeResponse()
+    expect(connection.authorizeIndex(withSession, served.response)).toBe(true)
+    // Without the marker, the token/cookie requirement still applies.
+    const denied = fakeResponse()
+    expect(connection.authorizeIndex(fakeRequest({ host: '127.0.0.1:3080' }, '/'), denied.response)).toBe(false)
+    expect(denied.state.status).toBe(401)
+    // A launch token with the session marker still completes the exchange
+    // (mints the cookie and 303s to the clean URL) instead of serving raw.
+    const exchanged = fakeResponse()
+    const launchUrl = new URL(connection.authenticatedUrl('http://127.0.0.1:3080'))
+    const withToken = fakeRequest({ host: '127.0.0.1:3080' }, `${launchUrl.pathname}${launchUrl.search}`)
+    Object.defineProperty(withToken, AUTH_USER, {
+      value: { permissions: ['page:chat'] },
+      configurable: true,
+    })
+    expect(connection.authorizeIndex(withToken, exchanged.response)).toBe(false)
+    expect(exchanged.state.status).toBe(303)
+    expect(exchanged.state.headers?.['set-cookie']).toBeDefined()
     await dispose()
   })
 
