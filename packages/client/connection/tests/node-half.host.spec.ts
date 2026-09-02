@@ -116,6 +116,11 @@ function browserCookie(connection: HostConnectionHandle, authority: string): str
   return setCookie.split(';', 1)[0]!
 }
 
+/** Configuration-plane methods the connection gates by page:settings (or loopback). */
+const CONFIGURATION_PLANE = new Set([
+  'llm/discoverModels',
+])
+
 describe('connection node half', () => {
   it('reserves enough default carrier capacity for the 200 MiB image batch', () => {
     expect(DEFAULT_MAX_REQUEST_BODY_BYTES).toBe(300 * 1024 * 1024)
@@ -186,7 +191,11 @@ describe('connection node half', () => {
         fakeRequest({ host: 'harness.example', cookie }, `${API_PATH}/${method}`),
         allowed.response,
       )
-      expect([method, allowed.state.status]).toEqual([method, 404])
+      // Configuration-plane methods additionally require an auth session with
+      // page:settings (or a loopback host); a non-loopback host carrying only
+      // the browser cookie is denied for them.
+      const expected = CONFIGURATION_PLANE.has(method) ? 403 : 404
+      expect([method, allowed.state.status]).toEqual([method, expected])
     }
 
     const forged = fakeResponse()
@@ -539,7 +548,9 @@ describe('connection node half over a real HTTP server', () => {
 
       const declaredCookie = browserCookie(connection, 'harness.example')
       for (const method of methods) {
-        expect([method, await call(port, method, 'harness.example', declaredCookie)]).toEqual([method, 404])
+        const expected = CONFIGURATION_PLANE.has(method) ? 403 : 404
+        expect([method, await call(port, method, 'harness.example', declaredCookie)])
+          .toEqual([method, expected])
       }
       const loopbackAuthority = `127.0.0.1:${String(port)}`
       expect(await call(

@@ -55,16 +55,17 @@ const REQUEST_ENVELOPE_HEADROOM_BYTES = 1024 * 1024
  * Native methods that launch or open host resources. Only a loopback
  * request may reach them: they can start a session as this process, and
  * pinning them keeps a LAN client from running commands or opening paths on
- * the host even with a valid browser session.
+ * the host even with a valid browser session. Endpoints use the wire form
+ * (`namespace/method`, the slash form `methodFromPath` extracts).
  */
 const NATIVE_METHODS = new Set([
-  'agentPreset.read',
-  'agentPreset.copy',
-  'agentPreset.openDocument',
-  'agentPreset.remove',
-  'host.pickDirectory',
-  'host.openPath',
-  'settings.openDocument',
+  'agentPreset/read',
+  'agentPreset/copy',
+  'agentPreset/openDocument',
+  'agentPreset/remove',
+  'host/pickDirectory',
+  'host/openPath',
+  'settings/openDocument',
 ])
 
 /**
@@ -73,14 +74,14 @@ const NATIVE_METHODS = new Set([
  * session-less loopback request passes the empty trust list instead.
  */
 const CONFIGURATION_METHODS = new Set([
-  'settings.describe',
-  'settings.update',
-  'settings.replace',
-  'settings.mutate',
-  'credentials.describe',
-  'credentials.set',
-  'credentials.unset',
-  'llm.discoverModels',
+  'settings/describe',
+  'settings/update',
+  'settings/replace',
+  'settings/mutate',
+  'credentials/describe',
+  'credentials/set',
+  'credentials/unset',
+  'llm/discoverModels',
 ])
 
 /** The permission a session needs to read or write the configuration plane. */

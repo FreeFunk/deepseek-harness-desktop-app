@@ -165,6 +165,24 @@ export const AUTH_BOOTSTRAP_SCRIPT = `(function(){
     if (button) button.style.borderRadius = trigger.getAttribute('data-dsh-settings-wide') === 'true' ? '12px' : '50%'
     positionMenu()
     refreshTrigger()
+    applyThemeColors()
+  }
+
+  // The chip text uses static neutral tokens that do not invert with the
+  // theme, so re-apply the theme's text color inline on every mount and on
+  // every body palette change. This guarantees the user chip follows the
+  // current skin even if a global stylesheet wins the CSS cascade.
+  function applyThemeColors(){
+    if (document.body === null || UI.triggerButton === null) return
+    var dark = document.body.hasAttribute('data-ds-dark-theme')
+    var text = dark
+      ? 'var(--dsw-static-neutral-bluish-50,#f9fafb)'
+      : 'var(--dsw-static-neutral-bluish-1000,#0f1115)'
+    UI.triggerButton.style.color = text
+    if (UI.menu !== null){
+      var nodes = UI.menu.querySelectorAll('button, .dsh-auth-user')
+      for (var i = 0; i < nodes.length; i++) nodes[i].style.color = text
+    }
   }
 
   var positionScheduled = false
@@ -214,9 +232,10 @@ export const AUTH_BOOTSTRAP_SCRIPT = `(function(){
     if (window.MutationObserver){
       new MutationObserver(function(){
       schedulePosition()
+      applyThemeColors()
       if (settingsTrigger() !== UI.anchor) mountAccountUI()
       })
-        .observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-dsh-settings-wide', 'class', 'style'] })
+        .observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-dsh-settings-wide', 'data-ds-dark-theme', 'class', 'style'] })
     }
   }
 

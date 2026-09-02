@@ -53,9 +53,13 @@ export const inject = ['remote', 'remote.settings']
  */
 export function apply(ctx: Context): void {
   const schema = new SettingsSchemaService(ctx)
-  // Resolved once here, where `remote` is declared in this plugin's own
-  // `inject`; the binder hands the same answer to every scope it binds.
-  const persistence = ctx.remote.$host.isLoopback ? 'host' : 'memory'
+  // Host persistence is the server's decision to gate, not the page origin:
+  // the connection configuration plane enforces the `page:settings`
+  // permission on every settings RPC (loopback or remote), so an
+  // authenticated remote browser reads and writes the same host document a
+  // local one does. The upstream loopback-only check left remote deployments
+  // with an "unavailable" settings surface even behind auth.
+  const persistence: 'host' | 'memory' = 'host'
   const mirror = new SettingsDescribeMirror(ctx, persistence)
   ctx.effect(() => {
     const disposers = [
