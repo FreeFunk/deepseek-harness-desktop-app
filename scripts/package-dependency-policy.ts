@@ -39,11 +39,15 @@ const DUPLICATE_SAFE_PACKAGES: readonly string[] = [
 
 /**
  * Runtime exports whose values remain valid when npm installs another package copy.
+ * New entries are forbidden by default. Automated agents must not add an
+ * exception; every addition requires explicit human review and a dedicated,
+ * prominent heading in the pull request description.
  */
 const SAFE_HOST_DEPENDENCY_EXPORTS = {
   '@deepseek-ai/dsh-credentials': ['credentialKey'],
   '@deepseek-ai/dsh-deque': ['Deque'],
   '@deepseek-ai/dsh-llm': ['callConfigEquals'],
+  '@deepseek-ai/dsh-session-format': ['sessionFormatLogFilename'],
   '@deepseek-ai/dsh-timeout': ['MAX_TIMER_DELAY_MS'],
   '@deepseek-ai/schemastery': ['default'],
 } as const satisfies HostDependencyExports
@@ -52,6 +56,7 @@ const SAFE_HOST_DEPENDENCY_EXPORTS = {
 const PEER_REQUIRED_HOST_EXPORTS = {
   '@deepseek-ai/dsh-host-webserver': ['authUserOf'],
   '@deepseek-ai/dsh-scope': ['carrierKeyOf', 'scopeOf', 'scopeTarget'],
+  '@deepseek-ai/dsh-session': ['SESSION_FORMAT_VERSION'],
   '@deepseek-ai/dsh-session-persistence': ['SessionPersistenceNotFoundError'],
 } as const satisfies HostDependencyExports
 
