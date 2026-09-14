@@ -27,10 +27,10 @@ describe('AuthStore', () => {
     }
   })
 
-  it('seeds the default admin/admin account', () => {
+  it('seeds the default admin/admin123 account', () => {
     const { store } = freshStore()
     try {
-      const user = store.verifyCredentials('admin', 'admin')
+      const user = store.verifyCredentials('admin', 'admin123')
       expect(user).not.toBeNull()
       expect(user?.username).toBe('admin')
       expect(user?.roleName).toBe('admin')

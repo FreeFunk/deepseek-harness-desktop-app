@@ -14,7 +14,7 @@
 import { spawn, type ChildProcess } from 'node:child_process'
 import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
-import { networkInterfaces } from 'node:os'
+import { homedir, networkInterfaces } from 'node:os'
 import { fileURLToPath } from 'node:url'
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
@@ -56,6 +56,12 @@ export interface Config {
   surfaceContext: boolean
   /** Explicit `--trusted-host` authorities from this invocation. */
   trustedHosts: string[]
+  /**
+   * SQLite database backing the auth plugin's users, roles, and sessions.
+   * Defaults to `~/.dsh/auth.db`; a deployment may relocate it, and tests
+   * point it at a temporary database to stay isolated from the real one.
+   */
+  authDbPath?: string
 }
 
 export const Config: z<Config> = z.object({
@@ -63,6 +69,7 @@ export const Config: z<Config> = z.object({
   printUrl: z.boolean().default(true),
   surfaceContext: z.boolean().default(true),
   trustedHosts: z.array(String).default([]),
+  authDbPath: z.string().default(join(homedir(), '.dsh', 'auth.db')),
 })
 
 /** Bind-dependent Web values shared by the trust fence and URL display. */
@@ -232,8 +239,10 @@ export function apply(ctx: Context, config: Config): void {
   ctx.provide(WEB_RUNTIME_SERVICE, runtime)
   ctx.plugin(FrontendStatic, { distIndex: internals.resolveDistIndex() })
 
-  // Mount auth routes and attach AUTH_USER to incoming requests.
-  applyAuth(ctx)
+  // Mount auth routes and attach AUTH_USER to incoming requests. Hand-built
+  // test contexts bypass the schema, so the explicit fallback keeps the
+  // default database path for an undefined field.
+  applyAuth(ctx, { dbPath: config.authDbPath ?? join(homedir(), '.dsh', 'auth.db') })
   if (config.surfaceContext) {
     ctx.inject(['systemPrompt'], (promptCtx) => {
       addHarnessSourceSection(promptCtx, SOURCE_ROOT)

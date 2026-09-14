@@ -78,6 +78,12 @@ function fakeHttpServer(host: '127.0.0.1' | '0.0.0.0' = '127.0.0.1'): { server: 
       fallback = handler
       return () => { fallback = undefined }
     },
+    // The auth plugin registers its transport guard, exact/prefix routes, and
+    // an index bootstrap tap through these seats; the fake runs none of them
+    // because these tests assert unauthenticated runtime glue behavior.
+    registerGuard: () => () => {},
+    register: () => () => {},
+    tapIndex: () => () => {},
     renderIndex: (html: string) => html,
   } as unknown as WebServer
   return { server, seat: () => fallback }

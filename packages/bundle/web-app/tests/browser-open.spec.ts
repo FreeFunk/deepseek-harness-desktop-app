@@ -42,6 +42,11 @@ describe('web app browser startup', () => {
     writeFileSync(index, '<!doctype html><title>ready</title>')
     internals.resolveDistIndex = () => index
 
+    // The auth guard rejects anonymous requests, so the fixture logs the
+    // seeded default account in against a temporary auth database and presents
+    // its session cookie.
+    const authDbPath = join(root, 'auth.db')
+
     const webserverModule = join(root, 'webserver.mjs')
     const connectionModule = join(root, 'connection.mjs')
     const webAppModule = join(root, 'web-app.mjs')
@@ -73,6 +78,7 @@ describe('web app browser startup', () => {
       '    printUrl: false',
       '    surfaceContext: false',
       '    trustedHosts: []',
+      `    authDbPath: ${JSON.stringify(authDbPath)}`,
       '',
     ].join('\n'))
 
@@ -105,7 +111,14 @@ describe('web app browser startup', () => {
     const opened = new Promise<void>((resolve) => { resolveOpened = resolve })
     internals.openBrowser = async (url) => {
       openedUrl = url
-      openedStatus = (await fetch(url)).status
+      const origin = new URL(url).origin
+      const login = await fetch(`${origin}/login`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ username: 'admin', password: 'admin123' }),
+      })
+      const cookie = login.headers.get('set-cookie')?.split(';', 1)[0] ?? ''
+      openedStatus = (await fetch(url, { headers: { cookie } })).status
       resolveOpened()
     }
 
