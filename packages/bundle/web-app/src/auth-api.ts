@@ -506,6 +506,9 @@ export function apply(
     if (user !== null) return next()
     const publicPath =
       pathname === '/login'
+      // The launch-token handshake authenticates itself; the guard must not
+      // redirect it to /login before BrowserAuth can exchange the token.
+      || pathname === '/connect'
       || pathname === '/api/auth/login'
       || pathname === '/api/auth/logout'
       || pathname === '/auth/login'
