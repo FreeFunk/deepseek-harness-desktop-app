@@ -14,7 +14,7 @@ import { clientRequestSchema } from './rpc-schema.ts'
 import { bridge } from './http-bridge.ts'
 import { isRemoteAuthority, isTrustedApiRequest } from './api-request-trust.ts'
 import { API_PATH } from './api-path.ts'
-import { authUserOf } from '@deepseek-ai/dsh-host-webserver'
+import { AUTH_USER_HEADER, authUserOf } from '@deepseek-ai/dsh-host-webserver'
 import type { BrowserAuth } from './browser-auth.ts'
 import { TOKEN_QUERY } from './browser-auth.ts'
 import { Peer } from './peer.ts'
@@ -71,6 +71,19 @@ declare module '@deepseek-ai/cordis' {
 
 /** Host Connection service whose channel registrations belong to the caller fiber. */
 export class HostConnectionService extends Service implements HostConnectionHandle {
+  /**
+   * Whether a request carries the auth guard's session marker. A Node request
+   * carries the user under AUTH_USER; a resource handler receives a Fetch
+   * Request whose headers were copied from it, so the guard's header is the
+   * marker that survives that conversion.
+   */
+  private static hasSessionMarker(request: ConnectionIndexRequest): boolean {
+    if (authUserOf(request as ConnectionIndexRequest & IncomingMessage) !== undefined) return true
+    const headers = request.headers
+    if (headers instanceof Headers) return headers.get(AUTH_USER_HEADER) !== null
+    return headers[AUTH_USER_HEADER] !== undefined
+  }
+
   /** The Peer every authenticated browser connection shares. */
   readonly browserPeer: PeerScope
   private readonly peers = new Map<PeerId, PeerRecord>()
@@ -203,7 +216,7 @@ export class HostConnectionService extends Service implements HostConnectionHand
     // already verified login, so index serving must not be rejected for the
     // missing browser-token exchange. A launch token still present completes
     // the exchange (BrowserAuth mints the cookie and 303s to the clean URL).
-    if (authUserOf(request as ConnectionIndexRequest & IncomingMessage) !== undefined
+    if (HostConnectionService.hasSessionMarker(request)
       && !new URL(request.url ?? '/', 'http://dsh.invalid').searchParams.has(TOKEN_QUERY)) {
       return true
     }

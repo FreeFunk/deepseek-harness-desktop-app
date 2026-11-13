@@ -23,7 +23,7 @@ import { homedir } from 'node:os'
 import { join, dirname } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
-import { AUTH_USER, type WebGuard } from '@deepseek-ai/dsh-host-webserver'
+import { AUTH_USER, AUTH_USER_HEADER, type WebGuard } from '@deepseek-ai/dsh-host-webserver'
 import type { WebRoute } from '@deepseek-ai/dsh-host-webserver'
 import type { WebServer } from '@deepseek-ai/dsh-host-webserver'
 import type { SessionToken } from './auth-user.ts'
@@ -502,6 +502,11 @@ export function apply(
     const pathname = new URL(target.req.url ?? '/', 'http://x').pathname
     const method = target.req.method ?? 'GET'
     const user = resolveUser(target.req)
+    // A resource handler receives a Fetch Request built from these headers, so
+    // the attached symbol does not survive; carry presence across the
+    // conversion and overwrite any client-supplied value.
+    if (user !== null) target.req.headers[AUTH_USER_HEADER] = '1'
+    else delete target.req.headers[AUTH_USER_HEADER]
     attachUser(target.req, user)
     if (user !== null) return next()
     const publicPath =

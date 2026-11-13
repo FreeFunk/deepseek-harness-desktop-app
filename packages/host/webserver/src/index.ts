@@ -26,7 +26,7 @@ import { renderIndexInjections, type IndexInjection } from './injections.ts'
 
 export { renderIndexInjections } from './injections.ts'
 export type { IndexInjection, IndexInjectionPlacement } from './injections.ts'
-export { AUTH_USER, type AuthUserFace, authUserOf } from './request-auth.ts'
+export { AUTH_USER, AUTH_USER_HEADER, type AuthUserFace, authUserOf } from './request-auth.ts'
 
 /**
  * One request guard: a per-request gate run before route, fallback, or upgrade

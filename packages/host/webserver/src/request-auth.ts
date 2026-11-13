@@ -12,6 +12,14 @@ import type { IncomingMessage } from 'node:http'
 /** Symbol carrying the authenticated session user a guard attached to the request. */
 export const AUTH_USER = Symbol('dsh.authUser')
 
+/**
+ * Internal header carrying the guard's presence marker into Fetch-derived
+ * requests. A resource handler receives a Fetch Request built from the Node
+ * request headers, so the symbol on the IncomingMessage does not survive that
+ * conversion; the guard sets this header on every request instead.
+ */
+export const AUTH_USER_HEADER = 'x-dsh-auth-user'
+
 /** The session-user face a fence reads permissions from (a structural subset of an auth plugin's user). */
 export interface AuthUserFace {
   /** Role-scoped permission keys the request's session holds. */
