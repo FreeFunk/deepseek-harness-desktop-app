@@ -557,12 +557,15 @@ export function apply(
   // Preserve the original transport-level rule using the upstream pre-dispatch
   // request waterfall: no named route may bypass RBAC before matching.
   ctx.on('webserver/request', async (req, res, next) => {
-    const pathname = new URL(req.url ?? '/', 'http://x').pathname
+    const url = new URL(req.url ?? '/', 'http://x')
+    const pathname = url.pathname
     const user = resolveUser(req)
     if (user !== null) req.headers[AUTH_USER_HEADER] = '1'
     else delete req.headers[AUTH_USER_HEADER]
     attachUser(req, user)
-    if (user !== null || isPublicAuthPath(pathname, req.method ?? 'GET')) {
+    if (user !== null
+      || (pathname === '/' && url.searchParams.has('token'))
+      || isPublicAuthPath(pathname, req.method ?? 'GET')) {
       await next()
       return
     }

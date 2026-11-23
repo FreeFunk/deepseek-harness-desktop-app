@@ -374,7 +374,7 @@ describe('ToolRuntime', () => {
       signal: testToolSignal,
       calls: [{
         type: 'tool-call',
-        id: ToolCallId('default-render'),
+        id: brandString<ToolCallId>('default-render'),
         name: 'default-render',
         arguments: JSON.stringify({ text: 'hello' }),
       }],
