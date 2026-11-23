@@ -64,8 +64,8 @@ function json(res: ServerResponse, status: number, body: unknown): void {
 /** Read the session cookie from either Node or Fetch header representations. */
 function readSessionCookieFromHeaders(headers: ConnectionTrustRequest['headers']): string | undefined {
   const raw = headers instanceof Headers ? headers.get('cookie') : headers.cookie
-  const header = Array.isArray(raw) ? raw.join('; ') : raw
-  if (header === undefined || header === null) return undefined
+  const header = typeof raw === 'string' ? raw : raw === null || raw === undefined ? undefined : raw.join('; ')
+  if (header === undefined) return undefined
   const match = header.match(new RegExp(`(?:^|;\\s*)${AUTH_SESSION_COOKIE}=([^;]*)`))
   return match?.[1]
 }
@@ -556,7 +556,7 @@ export function apply(
 
   // Preserve the original transport-level rule using the upstream pre-dispatch
   // request waterfall: no named route may bypass RBAC before matching.
-  webServer.on('webserver/request', async (req, res, next) => {
+  ctx.on('webserver/request', async (req, res, next) => {
     const pathname = new URL(req.url ?? '/', 'http://x').pathname
     const user = resolveUser(req)
     if (user !== null) req.headers[AUTH_USER_HEADER] = '1'
@@ -581,7 +581,7 @@ export function apply(
 
   // Upgrade admission runs after carrier authentication. Re-check the RBAC
   // cookie so an upstream token-only session cannot open a protected stream.
-  webServer.on('webserver/upgrade', async (req, socket, _head, _peer, next) => {
+  ctx.on('webserver/upgrade', async (req, socket, _head, _peer, next) => {
     const user = resolveUser(req)
     attachUser(req, user)
     if (user === null) {

@@ -28,6 +28,7 @@ import { renderIndexInjections, type IndexInjection } from './injections.ts'
 
 export { renderIndexInjections } from './injections.ts'
 export type { IndexInjection, IndexInjectionPlacement } from './injections.ts'
+export { AUTH_USER, AUTH_USER_HEADER, type AuthUserFace, authUserOf } from './request-auth.ts'
 
 /** One application entry URL contributed for startup printing or browser handoff. */
 export interface WebEntryUrl {
