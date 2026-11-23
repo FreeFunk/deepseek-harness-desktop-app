@@ -77,14 +77,6 @@ async function bootAuthServer(): Promise<RunningServer> {
     path: string
     handler: (req: IncomingMessage, res: ServerResponse) => void | Promise<void>
   }> = []
-  const requestListeners: Array<(req: IncomingMessage, res: ServerResponse, next: () => Promise<void>) => unknown> = []
-  const upgradeListeners: Array<(
-    req: IncomingMessage,
-    socket: import('node:stream').Duplex,
-    head: Buffer,
-    peer: import('@deepseek-ai/dsh-client-connection').PeerScope | undefined,
-    next: () => Promise<void>,
-  ) => unknown> = []
   const providers: AuthenticationProvider[] = []
   const webserverShim = {
     host: '127.0.0.1',
@@ -99,25 +91,6 @@ async function bootAuthServer(): Promise<RunningServer> {
     registerFallback: () => () => {},
     tapIndex: () => () => {},
     renderIndex: (html: string) => html,
-    on: (event: string, listener: (...args: never[]) => unknown) => {
-      if (event === 'webserver/request') {
-        const typed = listener as (req: IncomingMessage, res: ServerResponse, next: () => Promise<void>) => unknown
-        requestListeners.push(typed)
-        return () => {
-          const idx = requestListeners.indexOf(typed)
-          if (idx >= 0) requestListeners.splice(idx, 1)
-        }
-      }
-      if (event === 'webserver/upgrade') {
-        const typed = listener as typeof upgradeListeners[number]
-        upgradeListeners.push(typed)
-        return () => {
-          const idx = upgradeListeners.indexOf(typed)
-          if (idx >= 0) upgradeListeners.splice(idx, 1)
-        }
-      }
-      return () => {}
-    },
   } as unknown as WebServer
 
   const ctx = new Context()
@@ -142,11 +115,9 @@ async function bootAuthServer(): Promise<RunningServer> {
   // Start a real HTTP server that runs the pre-dispatch waterfall before
   // route matching, matching the production WebServer event order.
   const httpServer = createServer(async (req, res) => {
-    for (const listener of requestListeners) {
-      let delegated = false
-      await listener(req, res, async () => { delegated = true })
-      if (!delegated) return
-    }
+    let delegated = false
+    await ctx.waterfall(webserverShim, 'webserver/request', req, res, async () => { delegated = true })
+    if (!delegated) return
     const pathname = new URL(req.url ?? '/', 'http://x').pathname
     // Try exact match first.
     const exact = routes.find(r => r.kind === 'exact' && r.path === pathname)
