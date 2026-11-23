@@ -15,7 +15,7 @@ import { expect, it, onTestFinished, vi } from 'vitest'
 import * as Token from '@deepseek-ai/dsh-host-authentication-token'
 import * as WebApp from '../src/index.ts'
 
-it('opens its tokenized URL only after the complete authenticated page is reachable', async () => {
+it('opens its tokenized URL and routes a token-only browser to RBAC login', async () => {
   const root = await mkdtemp(join(tmpdir(), 'dsh-token-browser-open-'))
   const ctx = new Context()
   const originalOpen = WebApp.internals.openBrowser
@@ -44,9 +44,15 @@ it('opens its tokenized URL only after the complete authenticated page is reacha
       expect(login.headers.get('location')).toBe('./')
       const cookie = login.headers.get('set-cookie')?.split(';', 1)[0]
       if (cookie === undefined) throw new Error('Token startup did not issue a browser Cookie')
-      const page = await fetch(new URL('./', url), { headers: { cookie } })
-      expect(page.status).toBe(200)
-      const html = await page.text()
+      const page = await fetch(new URL('./', url), {
+        headers: { cookie, accept: 'text/html' },
+        redirect: 'manual',
+      })
+      expect(page.status).toBe(302)
+      expect(page.headers.get('location')).toBe('/login')
+      const loginPage = await fetch(new URL('/login', url))
+      expect(loginPage.status).toBe(200)
+      const html = await loginPage.text()
       const result = ctx.connection.authentication.authenticate({
         headers: { host: new URL(url).host, cookie },
       })
@@ -59,7 +65,7 @@ it('opens its tokenized URL only after the complete authenticated page is reacha
     { name: 'credentials', config: { path: join(root, 'credentials.yaml'), watch: false } },
     { name: 'connection' },
     { name: 'token', config: { cookieMaxAgeDays: 30 } },
-    { name: 'web-app', config: { printUrl: false } },
+    { name: 'web-app', config: { printUrl: false, authDbPath: join(root, 'auth.db') } },
   ]
   const config = join(root, 'cordis.yml')
   await writeFile(config, rows.map(row => `- ${JSON.stringify({ ...row, name: `cordis:${row.name}` })}`).join('\n') + '\n')
@@ -81,6 +87,6 @@ it('opens its tokenized URL only after the complete authenticated page is reacha
   expect(url.origin).toBe(ctx.webServer.getOrigin())
   expect(url.pathname).toBe('/')
   expect(url.searchParams.get('token')).toMatch(/^[A-Za-z0-9_-]{43}$/u)
-  expect(result.html).toContain('token-startup-ready')
+  expect(result.html.toLowerCase()).toContain('<!doctype html>')
   expect(result.peerAccepted).toBe(true)
 })
