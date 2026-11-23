@@ -14,7 +14,9 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import type { WebGuard, WebServer, WebRoute } from '@deepseek-ai/dsh-host-webserver'
+import type { WebServer, WebRoute } from '@deepseek-ai/dsh-host-webserver'
+import { Peer } from '@deepseek-ai/dsh-client-connection'
+import type { AuthenticationProvider } from '@deepseek-ai/dsh-client-connection'
 import { apply as applyAuth } from '../src/auth.ts'
 import { authBootstrapScript } from '../src/auth-api.ts'
 import type { AuthUser } from '../src/auth-user.ts'
@@ -59,6 +61,7 @@ interface RunningServer {
   close: () => Promise<void>
   ctx: Context
   cleanupAuth: () => void
+  providers: AuthenticationProvider[]
 }
 
 /**
@@ -69,9 +72,21 @@ interface RunningServer {
 async function bootAuthServer(): Promise<RunningServer> {
   const dir = mkdtempSync(join(tmpdir(), 'dsh-auth-api-test-'))
   const dbPath = join(dir, 'auth.db')
-  const routes: Array<{ kind: 'exact' | 'prefix'; path: string; handler: (req: IncomingMessage, res: ServerResponse) => void | Promise<void> }> = []
-  const guards: WebGuard[] = []
-  const webserverShim: WebServer = {
+  const routes: Array<{
+    kind: 'exact' | 'prefix'
+    path: string
+    handler: (req: IncomingMessage, res: ServerResponse) => void | Promise<void>
+  }> = []
+  const requestListeners: Array<(req: IncomingMessage, res: ServerResponse, next: () => Promise<void>) => unknown> = []
+  const upgradeListeners: Array<(
+    req: IncomingMessage,
+    socket: import('node:stream').Duplex,
+    head: Buffer,
+    peer: import('@deepseek-ai/dsh-client-connection').PeerScope | undefined,
+    next: () => Promise<void>,
+  ) => unknown> = []
+  const providers: AuthenticationProvider[] = []
+  const webserverShim = {
     host: '127.0.0.1',
     port: 0,
     register: (route: WebRoute) => {
@@ -82,29 +97,54 @@ async function bootAuthServer(): Promise<RunningServer> {
       }
     },
     registerFallback: () => () => {},
-    registerGuard: (guard: WebGuard) => {
-      guards.push(guard)
-      return () => {
-        const idx = guards.indexOf(guard)
-        if (idx >= 0) guards.splice(idx, 1)
-      }
-    },
     tapIndex: () => () => {},
     renderIndex: (html: string) => html,
+    on: (event: string, listener: (...args: never[]) => unknown) => {
+      if (event === 'webserver/request') {
+        const typed = listener as (req: IncomingMessage, res: ServerResponse, next: () => Promise<void>) => unknown
+        requestListeners.push(typed)
+        return () => {
+          const idx = requestListeners.indexOf(typed)
+          if (idx >= 0) requestListeners.splice(idx, 1)
+        }
+      }
+      if (event === 'webserver/upgrade') {
+        const typed = listener as typeof upgradeListeners[number]
+        upgradeListeners.push(typed)
+        return () => {
+          const idx = upgradeListeners.indexOf(typed)
+          if (idx >= 0) upgradeListeners.splice(idx, 1)
+        }
+      }
+      return () => {}
+    },
   } as unknown as WebServer
 
   const ctx = new Context()
+  const authentication = {
+    register(provider: AuthenticationProvider) {
+      providers.push(provider)
+      return async () => {
+        const idx = providers.indexOf(provider)
+        if (idx >= 0) providers.splice(idx, 1)
+      }
+    },
+  }
+  const connection = {
+    createPeer: () => new Peer(ctx, { principal: { kind: 'owner' } }),
+    authentication,
+  }
   ctx.provide('webServer', webserverShim)
+  ctx.provide('connection', connection)
+  ctx.provide('connection.authentication', authentication)
   applyAuth(ctx, { dbPath })
 
-  // Start a real http server that runs the transport guards in registration
-  // order (exactly like the production webserver) before dispatching to the
-  // registered routes, so the guard + dispatch double-resolution path is
-  // exercised.
+  // Start a real HTTP server that runs the pre-dispatch waterfall before
+  // route matching, matching the production WebServer event order.
   const httpServer = createServer(async (req, res) => {
-    for (const guard of guards) {
+    for (const listener of requestListeners) {
       let delegated = false
-      await guard({ req, res }, () => { delegated = true })
+      await listener(req, res, async () => { delegated = true })
       if (!delegated) return
     }
     const pathname = new URL(req.url ?? '/', 'http://x').pathname
@@ -137,8 +177,9 @@ async function bootAuthServer(): Promise<RunningServer> {
     baseUrl: `http://127.0.0.1:${String(port)}`,
     ctx,
     cleanupAuth: () => {
-      ctx.fiber.dispose()
+      void ctx.fiber.dispose()
     },
+    providers,
     close: () => new Promise<void>((resolve) => {
       httpServer.close(() => {
         rmSync(dir, { recursive: true, force: true })

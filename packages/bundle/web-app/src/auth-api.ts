@@ -23,9 +23,9 @@ import { homedir } from 'node:os'
 import { join, dirname } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
-import { AUTH_USER, AUTH_USER_HEADER, type WebGuard } from '@deepseek-ai/dsh-host-webserver'
-import type { WebRoute } from '@deepseek-ai/dsh-host-webserver'
-import type { WebServer } from '@deepseek-ai/dsh-host-webserver'
+import { AUTH_USER, AUTH_USER_HEADER } from '@deepseek-ai/dsh-host-webserver'
+import type { WebRoute, WebServer } from '@deepseek-ai/dsh-host-webserver'
+import type { ConnectionTrustRequest, PeerScope } from '@deepseek-ai/dsh-client-connection'
 import type { SessionToken } from './auth-user.ts'
 import type { AuthUser } from './auth-user.ts'
 import { AUTH_USER_KEY } from './auth-user.ts'
@@ -41,8 +41,8 @@ export const AUTH_SESSION_COOKIE = 'dsh_session'
 /** Stable Cordis plugin name. */
 export const name = 'dsh-web-app-auth'
 
-/** Plugin dependency: webserver for route registration. */
-export const inject = ['webServer']
+/** Services required for request guarding, route registration, and Peer authentication. */
+export const inject = ['webServer', 'connection', 'connection.authentication']
 
 /** Route prefix for auth API. */
 export const AUTH_API_PREFIX = '/auth'
@@ -61,12 +61,18 @@ function json(res: ServerResponse, status: number, body: unknown): void {
   res.end(JSON.stringify(body))
 }
 
-/** Read the session cookie value from a request. */
-function readSessionCookie(req: IncomingMessage): string | undefined {
-  const header = req.headers.cookie
-  if (!header) return undefined
+/** Read the session cookie from either Node or Fetch header representations. */
+function readSessionCookieFromHeaders(headers: ConnectionTrustRequest['headers']): string | undefined {
+  const raw = headers instanceof Headers ? headers.get('cookie') : headers.cookie
+  const header = Array.isArray(raw) ? raw.join('; ') : raw
+  if (header === undefined || header === null) return undefined
   const match = header.match(new RegExp(`(?:^|;\\s*)${AUTH_SESSION_COOKIE}=([^;]*)`))
   return match?.[1]
+}
+
+/** Read the session cookie value from a request. */
+function readSessionCookie(req: IncomingMessage): string | undefined {
+  return readSessionCookieFromHeaders(req.headers)
 }
 
 /** Set the session cookie on the response. */
@@ -495,24 +501,50 @@ export function apply(
     }
   }
 
-  // Transport gate: every request (HTTP and upgrade) passes here before any
-  // route, fallback, or upgrade handler. Only the public auth surface may
-  // proceed without a session.
-  const guard: WebGuard = (target, next) => {
-    const pathname = new URL(target.req.url ?? '/', 'http://x').pathname
-    const method = target.req.method ?? 'GET'
-    const user = resolveUser(target.req)
-    // A resource handler receives a Fetch Request built from these headers, so
-    // the attached symbol does not survive; carry presence across the
-    // conversion and overwrite any client-supplied value.
-    if (user !== null) target.req.headers[AUTH_USER_HEADER] = '1'
-    else delete target.req.headers[AUTH_USER_HEADER]
-    attachUser(target.req, user)
-    if (user !== null) return next()
-    const publicPath =
-      pathname === '/login'
-      // The launch-token handshake authenticates itself; the guard must not
-      // redirect it to /login before BrowserAuth can exchange the token.
+  const connection = ctx.get('connection')
+  const authentication = ctx.get('connection.authentication')
+  if (connection === undefined || authentication === undefined) {
+    throw new Error('dsh-web-app-auth: connection services are not available')
+  }
+
+  // Each RBAC session speaks for one connection Peer. The provider is consulted
+  // by the carrier's normal route admission, so named API and upgrade routes
+  // receive the same authenticated identity as the web UI.
+  const sessionPeers = new Map<string, PeerScope>()
+  ctx.effect(() => authentication.register({
+    authenticate(request: ConnectionTrustRequest) {
+      const token = readSessionCookieFromHeaders(request.headers)
+      if (token === undefined) return undefined
+      const user = store.getUserByToken(token as SessionToken)
+      if (user === null) {
+        const stale = sessionPeers.get(token)
+        if (stale !== undefined) {
+          sessionPeers.delete(token)
+          void stale.dispose()
+        }
+        return undefined
+      }
+      let peer = sessionPeers.get(token)
+      if (peer === undefined || peer.signal.aborted) {
+        peer = connection.createPeer({ principal: { kind: 'owner' } })
+        sessionPeers.set(token, peer)
+      }
+      return peer
+    },
+  }), 'dsh-web-app-auth: Connection authentication provider')
+
+  ctx.effect(() => async () => {
+    const peers = [...sessionPeers.values()]
+    sessionPeers.clear()
+    await Promise.all(peers.map(peer => peer.dispose().catch((error: unknown) => {
+      ctx.logger.warn(error instanceof Error ? error : new Error(String(error)))
+    })))
+  }, 'dsh-web-app-auth: session Peers')
+
+  function isPublicAuthPath(pathname: string, method: string): boolean {
+    return pathname === '/login'
+      || pathname === '/login-json'
+      // The upstream token provider owns /connect and the root token exchange.
       || pathname === '/connect'
       || pathname === '/api/auth/login'
       || pathname === '/api/auth/logout'
@@ -520,25 +552,44 @@ export function apply(
       || pathname === '/auth/logout'
       || pathname === '/logout'
       || (pathname === '/auth/login-json' && method === 'POST')
-    if (publicPath) return next()
-    if (target.socket !== undefined) { target.socket.destroy(); return }
-    if (target.res !== undefined) {
-      if (pathname.startsWith('/api/') || pathname.startsWith('/auth/')) {
-        json(target.res, 401, { error: '未登录' })
-        return
-      }
-      const accept = target.req.headers.accept ?? ''
-      if (accept.includes('text/html')) {
-        target.res.writeHead(302, { Location: loginUrlWithQuery(target.req) })
-        target.res.end()
-        return
-      }
-      json(target.res, 401, { error: '未登录' })
+  }
+
+  // Preserve the original transport-level rule using the upstream pre-dispatch
+  // request waterfall: no named route may bypass RBAC before matching.
+  webServer.on('webserver/request', async (req, res, next) => {
+    const pathname = new URL(req.url ?? '/', 'http://x').pathname
+    const user = resolveUser(req)
+    if (user !== null) req.headers[AUTH_USER_HEADER] = '1'
+    else delete req.headers[AUTH_USER_HEADER]
+    attachUser(req, user)
+    if (user !== null || isPublicAuthPath(pathname, req.method ?? 'GET')) {
+      await next()
       return
     }
-    return next()
-  }
-  ctx.effect(() => webServer.registerGuard(guard), 'dsh-web-app-auth: transport guard')
+    if (pathname.startsWith('/api/') || pathname.startsWith('/auth/')) {
+      json(res, 401, { error: '未登录' })
+      return
+    }
+    const accept = req.headers.accept ?? ''
+    if (accept.includes('text/html')) {
+      res.writeHead(302, { Location: loginUrlWithQuery(req) })
+      res.end()
+      return
+    }
+    json(res, 401, { error: '未登录' })
+  })
+
+  // Upgrade admission runs after carrier authentication. Re-check the RBAC
+  // cookie so an upstream token-only session cannot open a protected stream.
+  webServer.on('webserver/upgrade', async (req, socket, _head, _peer, next) => {
+    const user = resolveUser(req)
+    attachUser(req, user)
+    if (user === null) {
+      socket.destroy()
+      return
+    }
+    await next()
+  })
 
   // The marker on the request is keyed by a stable string rather than a
   // symbol identity, because Symbol keys are not visible to code outside the
@@ -648,22 +699,22 @@ export function apply(
 
   // Register exact routes first (matcher checks exact before prefix).
   const exactRoutes: WebRoute[] = [
-    { kind: 'exact', path: '/login', handler: (req, res) => { void dispatch(req, res) } },
-    { kind: 'exact', path: '/login-json', handler: (req, res) => { void dispatch(req, res) } },
-    { kind: 'exact', path: '/logout', handler: (req, res) => { void dispatch(req, res) } },
-    { kind: 'exact', path: '/admin', handler: (req, res) => { void dispatch(req, res) } },
-    { kind: 'exact', path: '/api/auth/login', handler: (req, res) => { void dispatch(req, res) } },
-    { kind: 'exact', path: '/api/auth/logout', handler: (req, res) => { void dispatch(req, res) } },
-    { kind: 'exact', path: '/api/auth/me', handler: (req, res) => { void dispatch(req, res) } },
-    { kind: 'exact', path: '/api/auth/password', handler: (req, res) => { void dispatch(req, res) } },
-    { kind: 'exact', path: '/api/auth/menus', handler: (req, res) => { void dispatch(req, res) } },
-    { kind: 'exact', path: '/api/auth/users', handler: (req, res) => { void dispatch(req, res) } },
-    { kind: 'exact', path: '/api/auth/roles', handler: (req, res) => { void dispatch(req, res) } },
-    { kind: 'exact', path: '/api/auth/permissions', handler: (req, res) => { void dispatch(req, res) } },
+    { kind: 'exact', path: '/login', auth: 'anonymous', handler: (req, res) => { void dispatch(req, res) } },
+    { kind: 'exact', path: '/login-json', auth: 'anonymous', handler: (req, res) => { void dispatch(req, res) } },
+    { kind: 'exact', path: '/logout', auth: 'anonymous', handler: (req, res) => { void dispatch(req, res) } },
+    { kind: 'exact', path: '/admin', auth: 'anonymous', handler: (req, res) => { void dispatch(req, res) } },
+    { kind: 'exact', path: '/api/auth/login', auth: 'anonymous', handler: (req, res) => { void dispatch(req, res) } },
+    { kind: 'exact', path: '/api/auth/logout', auth: 'anonymous', handler: (req, res) => { void dispatch(req, res) } },
+    { kind: 'exact', path: '/api/auth/me', auth: 'anonymous', handler: (req, res) => { void dispatch(req, res) } },
+    { kind: 'exact', path: '/api/auth/password', auth: 'anonymous', handler: (req, res) => { void dispatch(req, res) } },
+    { kind: 'exact', path: '/api/auth/menus', auth: 'anonymous', handler: (req, res) => { void dispatch(req, res) } },
+    { kind: 'exact', path: '/api/auth/users', auth: 'anonymous', handler: (req, res) => { void dispatch(req, res) } },
+    { kind: 'exact', path: '/api/auth/roles', auth: 'anonymous', handler: (req, res) => { void dispatch(req, res) } },
+    { kind: 'exact', path: '/api/auth/permissions', auth: 'anonymous', handler: (req, res) => { void dispatch(req, res) } },
   ]
   const prefixRoutes: WebRoute[] = [
-    { kind: 'prefix', path: '/auth', handler: (req, res) => { void dispatch(req, res) } },
-    { kind: 'prefix', path: '/api/auth', handler: (req, res) => { void dispatch(req, res) } },
+    { kind: 'prefix', path: '/auth', auth: 'anonymous', handler: (req, res) => { void dispatch(req, res) } },
+    { kind: 'prefix', path: '/api/auth', auth: 'anonymous', handler: (req, res) => { void dispatch(req, res) } },
   ]
 
   const disposers: Array<() => void> = []
